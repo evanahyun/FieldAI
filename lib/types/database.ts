@@ -35,6 +35,22 @@ export interface Lead {
   created_at: string;
 }
 
+/** Row shape for `insert into leads` (explicit so Supabase generics do not collapse to `never`). */
+export type LeadInsert = {
+  id?: string;
+  company_id: string;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  service_address?: string | null;
+  issue_type?: string | null;
+  urgency?: string | null;
+  status?: string;
+  preferred_time?: string | null;
+  summary?: string | null;
+  transcript?: string | null;
+  created_at?: string;
+};
+
 export interface Call {
   id: string;
   company_id: string;
@@ -48,6 +64,20 @@ export interface Call {
   ended_at: string | null;
   created_at: string;
 }
+
+export type CallInsert = {
+  id?: string;
+  company_id: string;
+  lead_id?: string | null;
+  caller_phone?: string | null;
+  call_status?: string | null;
+  transcript?: string | null;
+  summary?: string | null;
+  urgency?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+  created_at?: string;
+};
 
 export interface Appointment {
   id: string;

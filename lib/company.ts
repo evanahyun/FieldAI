@@ -1,8 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
 
 export async function getPrimaryCompanyId(
-  supabase: SupabaseClient<Database>,
+  supabase: SupabaseClient,
   userId: string,
 ): Promise<string | null> {
   const { data, error } = await supabase

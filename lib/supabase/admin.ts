@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "./database.types";
 
 export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -7,7 +6,7 @@ export function createAdminClient() {
   if (!url || !serviceRole) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   }
-  return createClient<Database>(url, serviceRole, {
+  return createClient(url, serviceRole, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

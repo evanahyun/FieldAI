@@ -23,6 +23,7 @@
 *.pem
 .env
 .env*.local
+.cursor/
 
 # debug
 npm-debug.log*

@@ -2,10 +2,21 @@ import type {
   AiSettings,
   Appointment,
   Call,
+  CallInsert,
   Company,
   CompanyUser,
   Lead,
+  LeadInsert,
 } from "../types/database";
+
+/** Must not be `[]` alone — TypeScript infers `never[]`, which breaks `.insert()` / `.update()` typing. */
+type SupabaseRelationship = {
+  foreignKeyName: string;
+  columns: string[];
+  isOneToOne?: boolean;
+  referencedRelation: string;
+  referencedColumns: string[];
+};
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -13,62 +24,60 @@ export type Database = {
   public: {
     Tables: {
       companies: {
-        Row: Company;
-        Insert: Omit<Company, "id" | "created_at"> & { id?: string; created_at?: string };
-        Update: Partial<Company>;
-        Relationships: [];
+        Row: Company & Record<string, unknown>;
+        Insert: Omit<Company, "id" | "created_at"> & { id?: string; created_at?: string } & Record<string, unknown>;
+        Update: Partial<Company> & Record<string, unknown>;
+        Relationships: SupabaseRelationship[];
       };
       company_users: {
-        Row: CompanyUser;
-        Insert: Omit<CompanyUser, "id" | "created_at"> & { id?: string; created_at?: string };
-        Update: Partial<CompanyUser>;
-        Relationships: [];
+        Row: CompanyUser & Record<string, unknown>;
+        Insert: Omit<CompanyUser, "id" | "created_at"> & { id?: string; created_at?: string } & Record<string, unknown>;
+        Update: Partial<CompanyUser> & Record<string, unknown>;
+        Relationships: SupabaseRelationship[];
       };
       leads: {
-        Row: Lead;
-        Insert: Omit<Lead, "id" | "created_at"> & { id?: string; created_at?: string };
-        Update: Partial<Lead>;
-        Relationships: [];
+        Row: Lead & Record<string, unknown>;
+        Insert: LeadInsert & Record<string, unknown>;
+        Update: Partial<Lead> & Record<string, unknown>;
+        Relationships: SupabaseRelationship[];
       };
       calls: {
-        Row: Call;
-        Insert: Omit<Call, "id" | "created_at"> & { id?: string; created_at?: string };
-        Update: Partial<Call>;
-        Relationships: [];
+        Row: Call & Record<string, unknown>;
+        Insert: CallInsert & Record<string, unknown>;
+        Update: Partial<Call> & Record<string, unknown>;
+        Relationships: SupabaseRelationship[];
       };
       appointments: {
-        Row: Appointment;
-        Insert: Omit<Appointment, "id" | "created_at"> & { id?: string; created_at?: string };
-        Update: Partial<Appointment>;
-        Relationships: [];
+        Row: Appointment & Record<string, unknown>;
+        Insert: Omit<Appointment, "id" | "created_at"> & { id?: string; created_at?: string } & Record<string, unknown>;
+        Update: Partial<Appointment> & Record<string, unknown>;
+        Relationships: SupabaseRelationship[];
       };
       ai_settings: {
-        Row: AiSettings;
+        Row: AiSettings & Record<string, unknown>;
         Insert: Omit<AiSettings, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
-        };
-        Update: Partial<AiSettings>;
-        Relationships: [];
+        } & Record<string, unknown>;
+        Update: Partial<AiSettings> & Record<string, unknown>;
+        Relationships: SupabaseRelationship[];
       };
     };
     Views: Record<string, never>;
     Functions: {
       create_company_with_owner: {
-        Args: { p_name: string; p_trade_type: string; p_phone: string };
+        Args: Record<string, unknown>;
         Returns: string;
       };
       join_company_by_invite: {
-        Args: { p_invite_token: string };
+        Args: Record<string, unknown>;
         Returns: string;
       };
       seed_demo_for_my_company: {
-        Args: { p_append?: boolean };
-        Returns: undefined;
+        Args: Record<string, unknown>;
+        Returns: unknown;
       };
     };
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
   };
 };
