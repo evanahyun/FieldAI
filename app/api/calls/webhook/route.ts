@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Urgency } from "@/lib/types/database";
+import type { Database } from "@/lib/supabase/database.types";
+import type { CallWebhookPayload, Urgency } from "@/lib/types/database";
 
 const URGENCY_LEVELS: Urgency[] = ["low", "medium", "high", "emergency"];
+
+type LeadsInsert = Database["public"]["Tables"]["leads"]["Insert"];
+type CallsInsert = Database["public"]["Tables"]["calls"]["Insert"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -30,47 +34,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Expected a JSON object" }, { status: 400 });
   }
 
-  const companyId = json.company_id;
-  const callerPhone = json.caller_phone;
-  const customerName = json.customer_name;
-  const serviceAddress = json.service_address;
-  const issueType = json.issue_type;
+  /** Webhook JSON uses snake_case keys (Vapi / Retell style). */
+  const company_id = json.company_id;
+  const caller_phone = json.caller_phone;
+  const customer_name = json.customer_name;
+  const service_address = json.service_address;
+  const issue_type = json.issue_type;
   const urgency = json.urgency;
-  const preferredTime = json.preferred_time;
+  const preferred_time = json.preferred_time;
   const summary = json.summary;
   const transcript = json.transcript;
-  const callStatus = json.call_status;
+  const call_status = json.call_status;
 
   const missing: string[] = [];
-  if (typeof companyId !== "string" || !companyId) missing.push("company_id");
-  if (typeof callerPhone !== "string" || !callerPhone) missing.push("caller_phone");
-  if (typeof customerName !== "string" || !customerName) missing.push("customer_name");
-  if (typeof serviceAddress !== "string" || !serviceAddress) missing.push("service_address");
-  if (typeof issueType !== "string" || !issueType) missing.push("issue_type");
+  if (typeof company_id !== "string" || !company_id) missing.push("company_id");
+  if (typeof caller_phone !== "string" || !caller_phone) missing.push("caller_phone");
+  if (typeof customer_name !== "string" || !customer_name) missing.push("customer_name");
+  if (typeof service_address !== "string" || !service_address) missing.push("service_address");
+  if (typeof issue_type !== "string" || !issue_type) missing.push("issue_type");
   if (typeof urgency !== "string" || !urgency) missing.push("urgency");
-  if (typeof preferredTime !== "string" || !preferredTime) missing.push("preferred_time");
+  if (typeof preferred_time !== "string" || !preferred_time) missing.push("preferred_time");
   if (typeof summary !== "string" || !summary) missing.push("summary");
   if (typeof transcript !== "string" || !transcript) missing.push("transcript");
-  if (typeof callStatus !== "string" || !callStatus) missing.push("call_status");
+  if (typeof call_status !== "string" || !call_status) missing.push("call_status");
 
   if (missing.length) {
     return NextResponse.json({ error: "Missing required fields", fields: missing }, { status: 400 });
   }
 
-  const body = {
-    companyId: companyId as string,
-    callerPhone: callerPhone as string,
-    customerName: customerName as string,
-    serviceAddress: serviceAddress as string,
-    issueType: issueType as string,
-    urgency: urgency as Urgency,
-    preferredTime: preferredTime as string,
-    summary: summary as string,
-    transcript: transcript as string,
-    callStatus: callStatus as string,
-  };
+  const p = json as unknown as CallWebhookPayload;
 
-  if (!URGENCY_LEVELS.includes(body.urgency)) {
+  if (!URGENCY_LEVELS.includes(p.urgency)) {
     return NextResponse.json({ error: "Invalid urgency", allowed: URGENCY_LEVELS }, { status: 400 });
   }
 
@@ -82,7 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  const { data: company, error: companyError } = await admin.from("companies").select("id").eq("id", body.companyId).maybeSingle();
+  const { data: company, error: companyError } = await admin.from("companies").select("id").eq("id", p.company_id).maybeSingle();
 
   if (companyError) {
     return NextResponse.json({ error: companyError.message }, { status: 500 });
@@ -94,42 +88,38 @@ export async function POST(request: Request) {
 
   const nowIso = new Date().toISOString();
 
-  const { data: lead, error: leadError } = await admin
-    .from("leads")
-    .insert({
-      company_id: body.companyId,
-      customer_name: body.customerName,
-      customer_phone: body.callerPhone,
-      service_address: body.serviceAddress,
-      issue_type: body.issueType,
-      urgency: body.urgency,
-      status: "New",
-      preferred_time: body.preferredTime,
-      summary: body.summary,
-      transcript: body.transcript,
-    })
-    .select("id")
-    .single();
+  const leadRow: LeadsInsert = {
+    company_id: p.company_id,
+    customer_name: p.customer_name,
+    customer_phone: p.caller_phone,
+    service_address: p.service_address,
+    issue_type: p.issue_type,
+    urgency: p.urgency,
+    status: "New",
+    preferred_time: p.preferred_time,
+    summary: p.summary,
+    transcript: p.transcript,
+  };
+
+  const { data: lead, error: leadError } = await admin.from("leads").insert(leadRow).select("id").single();
 
   if (leadError || !lead) {
     return NextResponse.json({ error: leadError?.message ?? "Failed to create lead" }, { status: 500 });
   }
 
-  const { data: call, error: callError } = await admin
-    .from("calls")
-    .insert({
-      company_id: body.companyId,
-      lead_id: lead.id,
-      caller_phone: body.callerPhone,
-      call_status: body.callStatus,
-      transcript: body.transcript,
-      summary: body.summary,
-      urgency: body.urgency,
-      started_at: nowIso,
-      ended_at: nowIso,
-    })
-    .select("id")
-    .single();
+  const callRow: CallsInsert = {
+    company_id: p.company_id,
+    lead_id: lead.id,
+    caller_phone: p.caller_phone,
+    call_status: p.call_status,
+    transcript: p.transcript,
+    summary: p.summary,
+    urgency: p.urgency,
+    started_at: nowIso,
+    ended_at: nowIso,
+  };
+
+  const { data: call, error: callError } = await admin.from("calls").insert(callRow).select("id").single();
 
   if (callError || !call) {
     return NextResponse.json({ error: callError?.message ?? "Failed to create call" }, { status: 500 });

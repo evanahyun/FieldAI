@@ -35,6 +35,8 @@ create table if not exists public.company_users (
 create index if not exists idx_company_users_user on public.company_users (user_id);
 create index if not exists idx_company_users_company on public.company_users (company_id);
 
+-- public.leads: id (default), company_id, customer_name, customer_phone, service_address,
+-- issue_type, urgency, status (default 'New'), preferred_time, summary, transcript, created_at (default)
 create table if not exists public.leads (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies (id) on delete cascade,

@@ -1,3 +1,8 @@
+/**
+ * Supabase `Database` type for `createClient<Database>()`.
+ * Row/Insert types live in `lib/types/database.ts`; keep them aligned with `supabase/schema.sql`.
+ * To regenerate from a linked project: `supabase gen types typescript --linked` and merge the output.
+ */
 import type {
   AiSettings,
   Appointment,
@@ -67,15 +72,15 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       create_company_with_owner: {
-        Args: Record<string, unknown>;
+        Args: { p_name: string; p_trade_type: string; p_phone: string } & Record<string, unknown>;
         Returns: string;
       };
       join_company_by_invite: {
-        Args: Record<string, unknown>;
+        Args: { p_invite_token: string } & Record<string, unknown>;
         Returns: string;
       };
       seed_demo_for_my_company: {
-        Args: Record<string, unknown>;
+        Args: { p_append?: boolean } & Record<string, unknown>;
         Returns: unknown;
       };
     };
