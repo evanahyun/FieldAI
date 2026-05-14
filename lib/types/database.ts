@@ -37,9 +37,9 @@ export interface Lead {
 
 /**
  * `public.leads` insert shape (snake_case, matches Supabase / Postgres).
- * Intersection with `Record<string, unknown>` satisfies `@supabase/postgrest-js` `GenericTable.Insert`.
+ * Keep as a plain object type (not `Record<string, unknown> & …`) so PostgREST `Insert` does not collapse to `never`.
  */
-export type LeadInsert = Record<string, unknown> & {
+export interface LeadInsert {
   id?: string;
   company_id: string;
   customer_name?: string | null;
@@ -52,7 +52,7 @@ export type LeadInsert = Record<string, unknown> & {
   summary?: string | null;
   transcript?: string | null;
   created_at?: string;
-};
+}
 
 export interface Call {
   id: string;
@@ -68,7 +68,7 @@ export interface Call {
   created_at: string;
 }
 
-export type CallInsert = Record<string, unknown> & {
+export interface CallInsert {
   id?: string;
   company_id: string;
   lead_id?: string | null;
@@ -80,7 +80,7 @@ export type CallInsert = Record<string, unknown> & {
   started_at?: string | null;
   ended_at?: string | null;
   created_at?: string;
-};
+}
 
 export interface Appointment {
   id: string;

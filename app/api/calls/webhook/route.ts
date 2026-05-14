@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import type { CallWebhookPayload, Urgency } from "@/lib/types/database";
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid urgency", allowed: URGENCY_LEVELS }, { status: 400 });
   }
 
-  let admin;
+  let admin: SupabaseClient<Database>;
   try {
     admin = createAdminClient();
   } catch (e) {
