@@ -2,6 +2,14 @@
 
 FieldAI stores **leads** and **calls** in Supabase when a call completes. The AI phone stack runs in **Vapi** (or any provider that can POST JSON); FieldAI is the CRM / dispatch backend.
 
+## Behavioral prompt vs. operator setup
+
+The system instructions FieldAI builds from **Dashboard → Receptionist** (`lib/ai/generateReceptionistPrompt.ts`) are **behavioral only**: identity, tone, intake, triage, scheduling language, angry callers, and how to close a call. They are written so the assistant behaves like a trained **front desk / dispatcher / intake** professional—not like a developer tool.
+
+They **intentionally do not** include JSON examples, webhook steps, `company_id`, “POST this…”, Vapi dashboard walkthroughs, or any backend jargon. Those topics stay **here** and in **Dashboard → Settings** (company ID, webhook URL, secrets).
+
+**After each call**, FieldAI’s **server** receives the provider payload (for example Vapi’s `end-of-call-report`), runs **transcript-backed extraction** (OpenAI on the server), and creates or dedupes **leads** and **calls**. The live assistant prompt only controls **how the AI sounds and behaves on the phone**; it does not describe how data is saved.
+
 ## Recommended: native Vapi webhook
 
 FieldAI exposes **`POST /api/vapi/webhook`** for Vapi’s **Server URL**. On each **`end-of-call-report`**, FieldAI:
@@ -76,15 +84,15 @@ All fields are **required** (use an empty string for `recording_url` if none):
 ## Receptionist rules in FieldAI
 
 1. Sign in and open **Dashboard → Receptionist** (route `/dashboard/ai-agent`).
-2. Fill in the business-focused sections; FieldAI builds the technical receptionist instructions automatically from what you save.
+2. Fill in the business-focused sections. FieldAI turns them into a **call-behavior** system prompt automatically—focused on how the assistant represents your business on the phone, not on integrations.
 
 ### Raw prompt text (developers only)
 
 The compiled prompt is produced by `lib/ai/generateReceptionistPrompt.ts`. To inspect it, run the app locally with `npm run dev` (`NODE_ENV=development`), open the same page, and enable **Show generated prompt** at the bottom. That control is omitted from production builds.
 
-If you maintain a separate voice stack (for example Vapi), paste the generated text into the provider’s system / instructions field when you need parity with FieldAI’s saved rules.
+If you use a separate voice stack (for example Vapi), paste that **behavioral** text into the provider’s system / instructions field. Keep **webhook URLs, secrets, and `company_id` metadata** configured in Vapi and in FieldAI Settings—do not paste integration docs into the assistant prompt.
 
-The prompt template stays **industry-agnostic** so one structure works for plumbers, HVAC, med spas, auto shops, and similar businesses.
+The prompt stays **industry-agnostic** so one structure works for plumbers, HVAC, electrical, roofing, landscaping, cleaning, contractors, med spas, wellness, auto shops, and similar local services.
 
 ## How to test without a live phone
 
