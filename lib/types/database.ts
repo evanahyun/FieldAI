@@ -35,7 +35,7 @@ export interface Lead {
   transcript: string | null;
   source: string | null;
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
 }
 
 export interface LeadInsert {

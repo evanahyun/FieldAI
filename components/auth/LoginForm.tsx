@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { describeSupabaseAuthNetworkError, isLikelyVercelPreviewHost } from "@/lib/supabase/authErrors";
@@ -15,6 +15,32 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const appliedUrlError = useRef(false);
+
+  useEffect(() => {
+    if (appliedUrlError.current) return;
+    const code = searchParams.get("error");
+    const desc = searchParams.get("error_description");
+    if (!code) return;
+    appliedUrlError.current = true;
+    if (code === "auth_callback" && desc) {
+      setError(decodeURIComponent(desc.replace(/\+/g, " ")));
+      return;
+    }
+    if (code === "missing_code") {
+      setError(
+        "The confirmation link was missing its code. Open the latest email link, or sign in if you already confirmed your account.",
+      );
+      return;
+    }
+    if (code === "server_config") {
+      setError(
+        "This deployment is missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Check Vercel environment variables and redeploy.",
+      );
+      return;
+    }
+    setError(`Sign-in could not complete (${code}).`);
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
