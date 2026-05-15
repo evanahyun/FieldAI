@@ -10,6 +10,8 @@ They **intentionally do not** include JSON examples, webhook steps, `company_id`
 
 **After each call**, FieldAI’s **server** receives the provider payload (for example Vapi’s `end-of-call-report`), runs **transcript-backed extraction** (OpenAI on the server), and creates or dedupes **leads** and **calls**. The live assistant prompt only controls **how the AI sounds and behaves on the phone**; it does not describe how data is saved.
 
+**For customers:** configure **business rules** under **Dashboard → Receptionist**—not raw system prompts. FieldAI turns those saved rules into the behavioral prompt automatically. **Operators** handle webhooks, credentials, and phone-system wiring using this doc and **Dashboard → Settings**, not by pasting integration instructions into the assistant prompt.
+
 ## Recommended: native Vapi webhook
 
 FieldAI exposes **`POST /api/vapi/webhook`** for Vapi’s **Server URL**. On each **`end-of-call-report`**, FieldAI:
