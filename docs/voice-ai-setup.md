@@ -1,45 +1,53 @@
 # Voice AI setup (Vapi-first)
 
-FieldAI receives completed phone calls via an HTTPS webhook and stores **leads** plus **calls** in Supabase. The AI agent itself runs in your voice provider (recommended: **Vapi**); FieldAI is the CRM / dispatch backend.
+FieldAI stores **leads** and **calls** in Supabase when a call completes. The AI phone stack runs in **Vapi** (or any provider that can POST JSON); FieldAI is the CRM / dispatch backend.
 
-## End-to-end flow
+## Recommended: native Vapi webhook
 
-1. A customer calls your **Vapi** phone number.
-2. Vapi runs your assistant using the **receptionist prompt** you configure (see below).
-3. When the call ends, Vapi (or a small serverless function you own) **POSTs JSON** to FieldAI:
-   - Production: `https://<your-vercel-domain>/api/calls/webhook`
-   - Local: `http://localhost:3000/api/calls/webhook`
-4. FieldAI validates the payload, inserts a **lead** and a **call**, and links `call.lead_id` → `lead.id`.
-5. Your team sees the lead under **Dashboard → Leads**.
+FieldAI exposes **`POST /api/vapi/webhook`** for Vapi’s **Server URL**. On each **`end-of-call-report`**, FieldAI:
 
-## Where to paste the generated prompt
+1. Verifies **`VAPI_WEBHOOK_SECRET`** (`Authorization: Bearer …` or **`X-Vapi-Secret`**, matching your Vapi Custom Credential).
+2. Reads **`company_id`** from Vapi **assistant or call metadata** (must match **Dashboard → Settings → Company ID**).
+3. Pulls transcript / recording hints from the Vapi payload.
+4. Calls **OpenAI** (`OPENAI_API_KEY`, optional `OPENAI_MODEL`, default `gpt-4o-mini`) to extract name, address, issue, urgency, preferred time, and summary.
+5. Inserts a **lead** and **call** (same as the generic webhook). Re-sends for the same Vapi `call.id` are **deduped**.
 
-1. Sign in to FieldAI and open **Dashboard → AI agent**.
-2. Fill in assistant name, greeting, tone, hours, services, intake questions, urgency rules, transfer phone, and booking instructions.
-3. Scroll to **Generated receptionist prompt** and copy the full text.
-4. In **Vapi**, open your assistant → system prompt / instructions → paste the copied prompt.
-5. Save and publish the assistant.
+### Vercel environment variables
 
-The prompt is intentionally **industry-agnostic** so the same template works for plumbers, HVAC, med spas, auto shops, etc.
+See **`.env.example`**. Minimum for this path:
 
-## Webhook URL
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_APP_URL` | Public app URL (no trailing slash); used in Settings to show the full Vapi Server URL to paste. |
+| `OPENAI_API_KEY` | Server-side extraction from transcript. |
+| `VAPI_WEBHOOK_SECRET` | Must match the token Vapi sends (Bearer or `X-Vapi-Secret`). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Required for inserts (server only). |
 
-In Vapi (or your proxy), configure an HTTP request to:
+Also set the Supabase client vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
-`POST /api/calls/webhook`
+### Vapi dashboard checklist
 
-Use your deployed base URL on Vercel, for example:
+1. **Assistant → Metadata** (or phone number metadata): add **`company_id`** = your FieldAI company UUID (from **Dashboard → Settings**).
+2. **Server URL**: `https://<your-domain>/api/vapi/webhook` (copy from Settings when `NEXT_PUBLIC_APP_URL` is set).
+3. **Server messages**: include **`end-of-call-report`**.
+4. **Custom Credential**: Bearer token (or legacy `X-Vapi-Secret`) = same value as `VAPI_WEBHOOK_SECRET` in Vercel.
 
-`https://fieldai.example.com/api/calls/webhook`
+## Alternative: generic JSON webhook
 
-## Optional webhook authentication
+If your stack already produces the full payload (no OpenAI in FieldAI), **`POST /api/calls/webhook`** accepts the same shape FieldAI has always used.
 
-Set `CALLS_WEBHOOK_SECRET` in Vercel (and locally in `.env.local`). When set, requests must include either:
+Use your deployed base URL, for example:
 
-- Header `Authorization: Bearer <CALLS_WEBHOOK_SECRET>`, or
+`https://your-app.vercel.app/api/calls/webhook`
+
+### Optional authentication
+
+Set **`CALLS_WEBHOOK_SECRET`** in Vercel. When set, requests must include either:
+
+- Header `Authorization: Bearer <CALLS_WEBHOOK_SECRET>`, or  
 - Header `X-Webhook-Secret: <CALLS_WEBHOOK_SECRET>`
 
-## JSON body FieldAI expects
+### JSON body (`/api/calls/webhook`)
 
 All fields are **required** (use an empty string for `recording_url` if none):
 
@@ -65,23 +73,27 @@ All fields are **required** (use an empty string for `recording_url` if none):
 
 `lead.source` is set to the `provider` string (e.g. `vapi`).
 
-## How to test without Vapi
+## Where to paste the generated prompt
+
+1. Sign in to FieldAI and open **Dashboard → AI agent**.
+2. Fill in assistant name, greeting, tone, hours, services, intake questions, urgency rules, transfer phone, and booking instructions.
+3. Scroll to **Generated receptionist prompt** and copy the full text.
+4. In **Vapi**, open your assistant → system prompt / instructions → paste the copied prompt.
+5. Save and publish the assistant.
+
+The prompt is intentionally **industry-agnostic** so the same template works for plumbers, HVAC, med spas, auto shops, etc.
+
+## How to test without a live phone
 
 1. Run FieldAI locally (`npm run dev`).
-2. Sign up / complete **Onboarding** so you have a `company_id`.
-3. Open **`/dev/test-call`**, edit the JSON if you like, and click **Send test webhook**.
-4. Confirm a **200** response with `lead_id`.
-5. Open **Dashboard → Leads** and click the new lead.
-
-In development you can also click **Load demo data** on the dashboard to insert multi-vertical sample rows.
+2. Complete **Onboarding** so you have a `company_id`.
+3. Open **`/dev/test-call`** and POST to **`/api/calls/webhook`** with the JSON above.
+4. Or use **Load demo data** on the dashboard for sample rows.
 
 ## Verifying production
 
-1. Deploy to Vercel with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and **`SUPABASE_SERVICE_ROLE_KEY`** (server only — never expose to the browser).
-2. Optionally set `CALLS_WEBHOOK_SECRET`.
-3. Place a test call through Vapi that ends in a webhook POST.
-4. Refresh **Dashboard** and **Leads** — the new lead should appear with correct urgency and summary.
+1. Deploy with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, **`SUPABASE_SERVICE_ROLE_KEY`**, **`OPENAI_API_KEY`**, **`VAPI_WEBHOOK_SECRET`**, and **`NEXT_PUBLIC_APP_URL`**.
+2. Place a test call through Vapi; when the call ends, Vapi should POST **`end-of-call-report`**.
+3. Refresh **Dashboard** and **Leads** — the new lead should appear.
 
-## Not fully integrated yet
-
-Native Vapi “one-click” install is **not** wired in-repo yet. Today you copy the prompt manually and point Vapi’s HTTP action / serverless bridge at FieldAI’s webhook. That keeps FieldAI provider-agnostic (Retell, Telnyx voice apps, etc. can use the same JSON contract).
+If the Table Editor shows columns but the API errors after migrations, run **`supabase/migrations/0004_post_drift_fix.sql`** (includes PostgREST schema reload).

@@ -3,7 +3,7 @@ export function getEmailConfirmationRedirectUrl(): string {
   if (typeof window === "undefined") {
     return "";
   }
-  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const fromEnv = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL)?.trim();
   if (fromEnv && /^https?:\/\//i.test(fromEnv)) {
     return `${fromEnv.replace(/\/$/, "")}/auth/callback`;
   }

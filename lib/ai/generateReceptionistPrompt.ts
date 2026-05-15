@@ -55,6 +55,10 @@ ${urgencyRules}
 ## Fallback
 ${fallback}
 
+## FieldAI + Vapi (operator setup)
+In Vapi, set **assistant or call metadata** so \`company_id\` is exactly: **${company.id}**
+For FieldAI's native Vapi webhook (recommended), configure the Vapi **Server URL** to \`https://<your-app-domain>/api/vapi/webhook\`, enable the **end-of-call-report** server message, and authenticate with the same bearer / \`X-Vapi-Secret\` token as \`VAPI_WEBHOOK_SECRET\` in FieldAI. FieldAI will read the transcript from Vapi and fill dispatch fields with OpenAI.
+
 ## Structured close (required)
 Before ending the call, mentally confirm you have: name, phone, address (if applicable), issue/service, urgency (low|medium|high|emergency), preferred time, and a short summary.
 Your platform integration should POST this JSON to the business webhook (server-side) when the call completes:

@@ -20,7 +20,13 @@ const INDUSTRIES = [
   { value: "other", label: "Other" },
 ];
 
-export function CompanySettingsForm({ company }: { company: Company }) {
+export function CompanySettingsForm({
+  company,
+  publicAppOrigin,
+}: {
+  company: Company;
+  publicAppOrigin: string | null;
+}) {
   const [state, action] = useActionState(saveCompanyProfile, initial);
 
   return (
@@ -75,6 +81,23 @@ export function CompanySettingsForm({ company }: { company: Company }) {
           <div className="sm:col-span-2">
             <p className="text-xs text-slate-500">
               Company ID (for voice webhooks): <span className="font-mono text-slate-700">{company.id}</span>
+            </p>
+            <p className="mt-3 text-xs font-medium text-slate-700">Vapi Server URL</p>
+            {publicAppOrigin ? (
+              <p className="mt-1 break-all font-mono text-xs text-slate-600">
+                {publicAppOrigin}/api/vapi/webhook
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-amber-800">
+                Set <span className="font-mono">NEXT_PUBLIC_APP_URL</span> on Vercel (e.g.{" "}
+                <span className="font-mono">https://fieldai-evan.vercel.app</span>) so this URL appears here.
+              </p>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+              In Vapi, add metadata <span className="font-mono">company_id</span> = the UUID above, enable server message{" "}
+              <span className="font-mono">end-of-call-report</span>, and use the same secret as{" "}
+              <span className="font-mono">VAPI_WEBHOOK_SECRET</span> (Bearer or{" "}
+              <span className="font-mono">X-Vapi-Secret</span>). See <span className="font-mono">docs/voice-ai-setup.md</span>.
             </p>
             {company.invite_token ? (
               <p className="mt-2 text-xs text-slate-500">

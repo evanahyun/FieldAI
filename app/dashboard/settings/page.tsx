@@ -2,6 +2,7 @@ import { tryCreateClient } from "@/lib/supabase/server";
 import { getPrimaryCompanyId } from "@/lib/company";
 import { CompanySettingsForm } from "@/components/dashboard/CompanySettingsForm";
 import { SupabaseConfigError } from "@/components/dashboard/SupabaseConfigError";
+import { getPublicAppOrigin } from "@/lib/site/publicOrigin";
 import type { Company } from "@/lib/types/database";
 
 export default async function SettingsPage() {
@@ -28,13 +29,15 @@ export default async function SettingsPage() {
     return <p className="text-sm text-red-600">Could not load company: {companyError?.message ?? "Unknown error"}</p>;
   }
 
+  const publicAppOrigin = getPublicAppOrigin();
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Settings</h1>
         <p className="mt-1 text-sm text-slate-600">Company profile and workspace identifiers.</p>
       </div>
-      <CompanySettingsForm company={company as Company} />
+      <CompanySettingsForm company={company as Company} publicAppOrigin={publicAppOrigin} />
     </div>
   );
 }
