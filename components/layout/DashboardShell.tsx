@@ -5,7 +5,7 @@ const links = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/leads", label: "Leads" },
   { href: "/dashboard/calls", label: "Calls" },
-  { href: "/dashboard/ai-agent", label: "AI agent" },
+  { href: "/dashboard/ai-agent", label: "Receptionist" },
   { href: "/dashboard/settings", label: "Settings" },
 ];
 

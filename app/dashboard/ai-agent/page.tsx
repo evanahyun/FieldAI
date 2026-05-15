@@ -37,8 +37,11 @@ export default async function AiAgentPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">AI agent</h1>
-        <p className="mt-1 text-sm text-slate-600">Configure how your phone agent represents {company.name}.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Phone receptionist</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
+          Set your business rules once. FieldAI handles calls and updates your dashboard automatically—you do not need to
+          write or edit a technical prompt.
+        </p>
       </div>
       <AiAgentSettingsForm company={company as Company} initialAi={ai as AiSettings | null} />
     </div>

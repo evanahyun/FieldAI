@@ -48,7 +48,7 @@ export async function saveAiAgentSettings(
 
   revalidatePath("/dashboard/ai-agent");
   revalidatePath("/dashboard");
-  return { ok: true, message: "AI agent settings saved." };
+  return { ok: true, message: "Business rules saved." };
 }
 
 function str(formData: FormData, key: string): string | null {

@@ -73,15 +73,18 @@ All fields are **required** (use an empty string for `recording_url` if none):
 
 `lead.source` is set to the `provider` string (e.g. `vapi`).
 
-## Where to paste the generated prompt
+## Receptionist rules in FieldAI
 
-1. Sign in to FieldAI and open **Dashboard → AI agent**.
-2. Fill in assistant name, greeting, tone, hours, services, intake questions, urgency rules, transfer phone, and booking instructions.
-3. Scroll to **Generated receptionist prompt** and copy the full text.
-4. In **Vapi**, open your assistant → system prompt / instructions → paste the copied prompt.
-5. Save and publish the assistant.
+1. Sign in and open **Dashboard → Receptionist** (route `/dashboard/ai-agent`).
+2. Fill in the business-focused sections; FieldAI builds the technical receptionist instructions automatically from what you save.
 
-The prompt is intentionally **industry-agnostic** so the same template works for plumbers, HVAC, med spas, auto shops, etc.
+### Raw prompt text (developers only)
+
+The compiled prompt is produced by `lib/ai/generateReceptionistPrompt.ts`. To inspect it, run the app locally with `npm run dev` (`NODE_ENV=development`), open the same page, and enable **Show generated prompt** at the bottom. That control is omitted from production builds.
+
+If you maintain a separate voice stack (for example Vapi), paste the generated text into the provider’s system / instructions field when you need parity with FieldAI’s saved rules.
+
+The prompt template stays **industry-agnostic** so one structure works for plumbers, HVAC, med spas, auto shops, and similar businesses.
 
 ## How to test without a live phone
 
