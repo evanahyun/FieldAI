@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { tryCreateBrowserClient } from "@/lib/supabase/client";
+import { describeSupabaseAuthNetworkError, isLikelyVercelPreviewHost } from "@/lib/supabase/authErrors";
 import { AuthCard } from "@/components/auth/AuthCard";
 
 type Flow = "create" | "join";
@@ -65,7 +66,9 @@ export function SignupForm() {
     const { data, error: signError } = await supabase.auth.signUp({ email, password });
     if (signError) {
       setLoading(false);
-      setError(signError.message);
+      setError(
+        describeSupabaseAuthNetworkError(signError.message, isLikelyVercelPreviewHost(window.location.hostname)),
+      );
       return;
     }
 
@@ -100,7 +103,9 @@ export function SignupForm() {
       const { data, error: signError } = await supabase.auth.signUp({ email, password });
       if (signError) {
         setLoading(false);
-        setError(signError.message);
+        setError(
+          describeSupabaseAuthNetworkError(signError.message, isLikelyVercelPreviewHost(window.location.hostname)),
+        );
         return;
       }
       if (!data.session) {
@@ -115,7 +120,9 @@ export function SignupForm() {
     });
     if (rpcError) {
       setLoading(false);
-      setError(rpcError.message);
+      setError(
+        describeSupabaseAuthNetworkError(rpcError.message, isLikelyVercelPreviewHost(window.location.hostname)),
+      );
       return;
     }
     if (!companyId) {

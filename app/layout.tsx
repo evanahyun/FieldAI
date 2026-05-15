@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { AuthEmailRedirectNotice } from "@/components/auth/AuthEmailRedirectNotice";
 import { BrowserSupabaseBanner } from "@/components/layout/BrowserSupabaseBanner";
 import { SupabaseEnvBanner } from "@/components/layout/SupabaseEnvBanner";
 import "./globals.css";
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className={`${inter.variable} min-h-screen bg-white font-sans antialiased`}>
         <SupabaseEnvBanner />
         <BrowserSupabaseBanner />
+        <AuthEmailRedirectNotice />
         {children}
       </body>
     </html>
