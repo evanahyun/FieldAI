@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { tryCreateBrowserClient } from "@/lib/supabase/client";
 import { describeSupabaseAuthNetworkError, isLikelyVercelPreviewHost } from "@/lib/supabase/authErrors";
+import { getEmailConfirmationRedirectUrl } from "@/lib/auth/emailRedirect";
 import { AuthCard } from "@/components/auth/AuthCard";
 
 type Flow = "create" | "join";
@@ -63,7 +64,12 @@ export function SignupForm() {
       return;
     }
     const supabase = configured.client;
-    const { data, error: signError } = await supabase.auth.signUp({ email, password });
+    const redirectTo = getEmailConfirmationRedirectUrl();
+    const { data, error: signError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+    });
     if (signError) {
       setLoading(false);
       setError(
@@ -100,7 +106,12 @@ export function SignupForm() {
     const supabase = configured.client;
 
     if (!hasSession) {
-      const { data, error: signError } = await supabase.auth.signUp({ email, password });
+      const redirectTo = getEmailConfirmationRedirectUrl();
+      const { data, error: signError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+      });
       if (signError) {
         setLoading(false);
         setError(

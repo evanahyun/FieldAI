@@ -47,3 +47,35 @@ Optional query: `?next=/onboarding` is allowed (must be a same-site path startin
 
 - **Authentication → Email Templates → Confirm signup:** ensure links use Supabase’s default variables so `redirect_to` resolves to your Site URL / allowed redirect, not the raw API host.
 - Request a **new** email after changing URLs; old messages keep old links.
+
+## “It won’t send the email” (nothing arrives)
+
+FieldAI only calls `signUp()`; **delivery is 100% controlled in Supabase** (and your mail provider). Check these in order:
+
+1. **Redirect URLs must allow the link Supabase puts in the email**  
+   Add this exact URL (use your real host):  
+   `https://fieldai-evan.vercel.app/auth/callback`  
+   The wildcard `https://fieldai-evan.vercel.app/**` should also work, but if anything is mis-typed, add the explicit `/auth/callback` line.
+
+2. **Authentication → Providers → Email**  
+   Confirm **Email** is enabled. If you use **custom SMTP**, open **Project Settings → Auth → SMTP** and fix any SMTP errors (bad password, wrong host). A broken SMTP setup often means **no emails at all**.
+
+3. **Authentication → Logs** (or **Reports → Auth** if available)  
+   Look for errors when you click Sign up (rate limit, SMTP bounce, invalid redirect).
+
+4. **Same email already registered**  
+   If the user already exists, Supabase may **not** send another confirmation from `signUp` (and may return a generic success for security). In **Authentication → Users**, delete the test user or use **another email address**.
+
+5. **Spam / Promotions**  
+   Search for `supabase` or `noreply`.
+
+6. **Free-tier rate limits**  
+   Too many signups in a short window can temporarily stop mail; wait ~1 hour or use a different inbox.
+
+### FieldAI change (after deploy)
+
+Sign up now sends:
+
+`emailRedirectTo = <your current origin>/auth/callback`
+
+so the confirmation link matches your app. Optional env: **`NEXT_PUBLIC_SITE_URL=https://fieldai-evan.vercel.app`** if you ever need a fixed canonical URL.
