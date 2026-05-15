@@ -2,13 +2,27 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { tryCreateBrowserClient } from "@/lib/supabase/client";
 import { AuthCard } from "@/components/auth/AuthCard";
+
+const INDUSTRIES = [
+  { value: "plumbing", label: "Plumbing" },
+  { value: "hvac", label: "HVAC" },
+  { value: "electrical", label: "Electrical" },
+  { value: "roofing", label: "Roofing" },
+  { value: "landscaping", label: "Landscaping" },
+  { value: "cleaning", label: "Cleaning" },
+  { value: "general_contractor", label: "General contractor" },
+  { value: "med_spa", label: "Med spa / aesthetics" },
+  { value: "auto_repair", label: "Auto repair" },
+  { value: "wellness", label: "Wellness / fitness" },
+  { value: "other", label: "Other local services" },
+];
 
 export function OnboardingForm() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [tradeType, setTradeType] = useState("trenchless_sewer");
+  const [industry, setIndustry] = useState("plumbing");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,10 +31,16 @@ export function OnboardingForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const supabase = createClient();
+    const configured = tryCreateBrowserClient();
+    if (!configured.ok) {
+      setLoading(false);
+      setError(configured.error);
+      return;
+    }
+    const supabase = configured.client;
     const { data, error: rpcError } = await supabase.rpc("create_company_with_owner", {
       p_name: name.trim(),
-      p_trade_type: tradeType.trim(),
+      p_industry: industry.trim(),
       p_phone: phone.trim() || "",
     });
     setLoading(false);
@@ -38,8 +58,8 @@ export function OnboardingForm() {
 
   return (
     <AuthCard
-      title="Create your company"
-      subtitle="This workspace is private to your team. You can invite teammates later."
+      title="Set up your company"
+      subtitle="Tell us the basics so your AI receptionist and dashboard are scoped correctly."
     >
       <form className="space-y-4" onSubmit={onSubmit}>
         <div>
@@ -51,25 +71,25 @@ export function OnboardingForm() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="TrenchFlow Sewer Co."
+            placeholder="Summit Valley Plumbing"
             className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ring-accent focus:ring-2"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="trade">
-            Trade type
+          <label className="block text-sm font-medium text-slate-700" htmlFor="industry">
+            Industry
           </label>
           <select
-            id="trade"
-            value={tradeType}
-            onChange={(e) => setTradeType(e.target.value)}
+            id="industry"
+            value={industry}
+            onChange={(e) => setIndustry(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ring-accent focus:ring-2"
           >
-            <option value="plumbing">Plumbing</option>
-            <option value="trenchless_sewer">Trenchless sewer</option>
-            <option value="hvac">HVAC</option>
-            <option value="general_contractor">General contractor</option>
-            <option value="other">Other</option>
+            {INDUSTRIES.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </div>
         <div>

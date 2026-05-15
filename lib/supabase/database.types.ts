@@ -30,7 +30,11 @@ export type Database = {
     Tables: {
       companies: {
         Row: Company & Record<string, unknown>;
-        Insert: Omit<Company, "id" | "created_at"> & { id?: string; created_at?: string } & Record<string, unknown>;
+        Insert: Omit<Company, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        } & Record<string, unknown>;
         Update: Partial<Company> & Record<string, unknown>;
         Relationships: SupabaseRelationship[];
       };
@@ -72,7 +76,7 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       create_company_with_owner: {
-        Args: { p_name: string; p_trade_type: string; p_phone: string } & Record<string, unknown>;
+        Args: { p_name: string; p_industry: string; p_phone: string } & Record<string, unknown>;
         Returns: string;
       };
       join_company_by_invite: {

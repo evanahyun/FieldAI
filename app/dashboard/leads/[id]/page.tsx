@@ -4,7 +4,7 @@ import { tryCreateClient } from "@/lib/supabase/server";
 import { getPrimaryCompanyId } from "@/lib/company";
 import { LeadStatusForm } from "@/components/leads/LeadStatusForm";
 import { SupabaseConfigError } from "@/components/dashboard/SupabaseConfigError";
-import type { Lead } from "@/lib/types/database";
+import type { Call, Lead } from "@/lib/types/database";
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,6 +36,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   }
 
   const lead = data as Lead;
+
+  const { data: linkedCall } = await supabase
+    .from("calls")
+    .select("*")
+    .eq("company_id", companyId)
+    .eq("lead_id", lead.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const call = linkedCall as Call | null;
 
   return (
     <div className="space-y-6">
@@ -70,6 +81,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <dt className="text-slate-500">Preferred time</dt>
               <dd className="font-medium text-slate-900">{lead.preferred_time ?? "—"}</dd>
             </div>
+            <div>
+              <dt className="text-slate-500">Source</dt>
+              <dd className="font-medium text-slate-900">{lead.source ?? "—"}</dd>
+            </div>
           </dl>
         </section>
 
@@ -88,8 +103,57 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <dt className="text-slate-500">Created</dt>
               <dd className="font-medium text-slate-900">{new Date(lead.created_at).toLocaleString()}</dd>
             </div>
+            <div>
+              <dt className="text-slate-500">Updated</dt>
+              <dd className="font-medium text-slate-900">
+                {new Date(lead.updated_at ?? lead.created_at).toLocaleString()}
+              </dd>
+            </div>
           </dl>
         </section>
+
+        {call ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
+            <h2 className="text-sm font-semibold text-slate-900">Linked call</h2>
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-slate-500">Provider</dt>
+                <dd className="font-medium text-slate-900">{call.provider ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Caller</dt>
+                <dd className="font-medium text-slate-900">{call.caller_phone ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Status</dt>
+                <dd className="font-medium text-slate-900">{call.call_status ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Provider call ID</dt>
+                <dd className="font-mono text-xs font-medium text-slate-900">{call.provider_call_id ?? "—"}</dd>
+              </div>
+              {call.recording_url ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-slate-500">Recording</dt>
+                  <dd className="mt-1">
+                    <a
+                      href={call.recording_url}
+                      className="font-semibold text-accent hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open recording
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Call summary</p>
+              <p className="mt-1 text-sm text-slate-800">{call.summary ?? "—"}</p>
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
           <h2 className="text-sm font-semibold text-slate-900">Summary</h2>

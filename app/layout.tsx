@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { BrowserSupabaseBanner } from "@/components/layout/BrowserSupabaseBanner";
 import { SupabaseEnvBanner } from "@/components/layout/SupabaseEnvBanner";
 import "./globals.css";
 
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} min-h-screen bg-white font-sans antialiased`}>
         <SupabaseEnvBanner />
+        <BrowserSupabaseBanner />
         {children}
       </body>
     </html>

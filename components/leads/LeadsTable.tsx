@@ -5,9 +5,9 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
   if (!leads.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-600">
-        No leads yet. Use{" "}
-        <span className="font-semibold text-slate-800">Settings → Load demo data</span> for sample rows, or POST to{" "}
-        <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/calls/webhook</code>.
+        No leads yet. In development, use <span className="font-semibold text-slate-800">Load demo data</span> on the
+        dashboard, or POST to <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/calls/webhook</code>{" "}
+        from the <a className="font-semibold text-accent hover:underline" href="/dev/test-call">test call page</a>.
       </div>
     );
   }
@@ -21,6 +21,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
             <th className="px-5 py-3">Issue</th>
             <th className="px-5 py-3">Urgency</th>
             <th className="px-5 py-3">Status</th>
+            <th className="px-5 py-3">Source</th>
             <th className="px-5 py-3">Created</th>
           </tr>
         </thead>
@@ -40,6 +41,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                   {lead.status}
                 </span>
               </td>
+              <td className="px-5 py-4 text-xs text-slate-600">{lead.source ?? "—"}</td>
               <td className="px-5 py-4 text-xs text-slate-500">{new Date(lead.created_at).toLocaleString()}</td>
             </tr>
           ))}

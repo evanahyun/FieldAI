@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { LeadStatus } from "@/lib/types/database";
 import { updateLeadStatus } from "@/app/dashboard/leads/[id]/actions";
 
-const statuses: LeadStatus[] = ["New", "Contacted", "Booked", "Closed", "Lost"];
+const statuses: LeadStatus[] = ["New", "Contacted", "Qualified", "Booked", "Completed", "Lost"];
 
 export function LeadStatusForm({ leadId, initialStatus }: { leadId: string; initialStatus: string }) {
   const [pending, startTransition] = useTransition();
@@ -25,6 +25,8 @@ export function LeadStatusForm({ leadId, initialStatus }: { leadId: string; init
     });
   }
 
+  const safeInitial = statuses.includes(initialStatus as LeadStatus) ? initialStatus : "New";
+
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-slate-700" htmlFor="status">
@@ -32,7 +34,7 @@ export function LeadStatusForm({ leadId, initialStatus }: { leadId: string; init
       </label>
       <select
         id="status"
-        defaultValue={initialStatus}
+        defaultValue={safeInitial}
         disabled={pending}
         onChange={onChange}
         className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ring-accent focus:ring-2"

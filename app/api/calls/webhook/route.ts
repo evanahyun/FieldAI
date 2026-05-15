@@ -35,8 +35,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Expected a JSON object" }, { status: 400 });
   }
 
-  /** Webhook JSON uses snake_case keys (Vapi / Retell style). */
   const company_id = json.company_id;
+  const provider = json.provider;
+  const provider_call_id = json.provider_call_id;
   const caller_phone = json.caller_phone;
   const customer_name = json.customer_name;
   const service_address = json.service_address;
@@ -45,10 +46,13 @@ export async function POST(request: Request) {
   const preferred_time = json.preferred_time;
   const summary = json.summary;
   const transcript = json.transcript;
+  const recording_url = json.recording_url;
   const call_status = json.call_status;
 
   const missing: string[] = [];
   if (typeof company_id !== "string" || !company_id) missing.push("company_id");
+  if (typeof provider !== "string" || !provider) missing.push("provider");
+  if (typeof provider_call_id !== "string" || !provider_call_id) missing.push("provider_call_id");
   if (typeof caller_phone !== "string" || !caller_phone) missing.push("caller_phone");
   if (typeof customer_name !== "string" || !customer_name) missing.push("customer_name");
   if (typeof service_address !== "string" || !service_address) missing.push("service_address");
@@ -57,6 +61,7 @@ export async function POST(request: Request) {
   if (typeof preferred_time !== "string" || !preferred_time) missing.push("preferred_time");
   if (typeof summary !== "string" || !summary) missing.push("summary");
   if (typeof transcript !== "string" || !transcript) missing.push("transcript");
+  if (typeof recording_url !== "string") missing.push("recording_url");
   if (typeof call_status !== "string" || !call_status) missing.push("call_status");
 
   if (missing.length) {
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
     preferred_time: p.preferred_time,
     summary: p.summary,
     transcript: p.transcript,
+    source: p.provider,
   };
 
   const { data: lead, error: leadError } = await admin.from("leads").insert(leadRow).select("id").single();
@@ -111,8 +117,11 @@ export async function POST(request: Request) {
   const callRow: CallsInsert = {
     company_id: p.company_id,
     lead_id: lead.id,
+    provider: p.provider,
+    provider_call_id: p.provider_call_id,
     caller_phone: p.caller_phone,
     call_status: p.call_status,
+    recording_url: p.recording_url || null,
     transcript: p.transcript,
     summary: p.summary,
     urgency: p.urgency,

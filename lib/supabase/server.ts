@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import type { Database } from "./database.types";
 
-export async function createClient(): Promise<SupabaseClient> {
+export async function createClient(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -10,7 +11,7 @@ export async function createClient(): Promise<SupabaseClient> {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
 
-  return createServerClient(url, key, {
+  return createServerClient<Database>(url, key, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -25,12 +26,12 @@ export async function createClient(): Promise<SupabaseClient> {
         }
       },
     },
-  });
+  }) as unknown as SupabaseClient<Database>;
 }
 
 /** Use in route handlers / pages when you want a friendly UI instead of throwing. */
 export async function tryCreateClient(): Promise<
-  { ok: true; supabase: SupabaseClient } | { ok: false; error: string }
+  { ok: true; supabase: SupabaseClient<Database> } | { ok: false; error: string }
 > {
   try {
     const supabase = await createClient();

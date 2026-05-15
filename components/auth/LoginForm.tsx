@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { tryCreateBrowserClient } from "@/lib/supabase/client";
 import { AuthCard } from "@/components/auth/AuthCard";
 
 export function LoginForm() {
@@ -19,7 +19,15 @@ export function LoginForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const supabase = createClient();
+
+    const configured = tryCreateBrowserClient();
+    if (!configured.ok) {
+      setError(configured.error);
+      setLoading(false);
+      return;
+    }
+    const supabase = configured.client;
+
     const { error: signError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (signError) {

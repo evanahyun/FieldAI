@@ -44,7 +44,17 @@ export default async function CallsPage() {
       {calls.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-600">
           No calls yet. Wire your voice agent to POST completed calls to{" "}
-          <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/calls/webhook</code>.
+          <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/calls/webhook</code>
+          {process.env.NODE_ENV === "development" ? (
+            <>
+              {" "}
+              or use the{" "}
+              <Link href="/dev/test-call" className="font-semibold text-accent hover:underline">
+                test call page
+              </Link>
+              .
+            </>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">
@@ -54,6 +64,15 @@ export default async function CallsPage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{call.caller_phone ?? "—"}</p>
                   <p className="mt-1 text-xs text-slate-500">
+                    Provider: <span className="font-medium text-slate-700">{call.provider ?? "—"}</span>
+                    {call.provider_call_id ? (
+                      <>
+                        {" "}
+                        · ID: <span className="font-mono text-slate-700">{call.provider_call_id}</span>
+                      </>
+                    ) : null}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
                     Status: <span className="font-medium text-slate-700">{call.call_status ?? "—"}</span> · Urgency:{" "}
                     <span className="font-medium capitalize text-slate-700">{call.urgency ?? "—"}</span>
                   </p>
@@ -61,6 +80,18 @@ export default async function CallsPage() {
                     Started: {call.started_at ? new Date(call.started_at).toLocaleString() : "—"} · Ended:{" "}
                     {call.ended_at ? new Date(call.ended_at).toLocaleString() : "—"}
                   </p>
+                  {call.recording_url ? (
+                    <p className="mt-2 text-xs">
+                      <a
+                        href={call.recording_url}
+                        className="font-semibold text-accent hover:underline"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open recording
+                      </a>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="text-right text-xs text-slate-500">
                   Logged {new Date(call.created_at).toLocaleString()}

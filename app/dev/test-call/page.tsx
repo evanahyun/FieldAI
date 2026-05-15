@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import { tryCreateClient } from "@/lib/supabase/server";
 import { getPrimaryCompanyId } from "@/lib/company";
-import { OnboardingForm } from "@/components/auth/OnboardingForm";
+import TestCallForm from "./TestCallForm";
 import { SupabaseConfigError } from "@/components/dashboard/SupabaseConfigError";
 
-export default async function OnboardingPage() {
+export default async function TestCallPage() {
+  if (process.env.NODE_ENV === "production") {
+    redirect("/dashboard");
+  }
+
   const client = await tryCreateClient();
   if (!client.ok) {
     return <SupabaseConfigError message={client.error} />;
@@ -14,16 +18,17 @@ export default async function OnboardingPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login?redirect=/onboarding");
-  }
-  const companyId = await getPrimaryCompanyId(supabase, user.id);
-  if (companyId) {
-    redirect("/dashboard");
+    redirect("/login?redirect=/dev/test-call");
   }
 
-  return (
-    <div className="mx-auto max-w-lg px-4 py-16">
-      <OnboardingForm />
-    </div>
-  );
+  const companyId = await getPrimaryCompanyId(supabase, user.id);
+  if (!companyId) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-sm text-slate-700">
+        Join or create a company first, then return here.
+      </div>
+    );
+  }
+
+  return <TestCallForm companyId={companyId} />;
 }

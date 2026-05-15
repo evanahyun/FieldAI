@@ -3,6 +3,7 @@ import { getPrimaryCompanyId } from "@/lib/company";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { RecentLeads } from "@/components/dashboard/RecentLeads";
 import { RecentCalls } from "@/components/dashboard/RecentCalls";
+import { LoadDemoDataButton } from "@/components/dashboard/LoadDemoDataButton";
 import { SupabaseConfigError } from "@/components/dashboard/SupabaseConfigError";
 import type { Call, Lead } from "@/lib/types/database";
 
@@ -24,14 +25,14 @@ export default async function DashboardHomePage() {
     return null;
   }
 
-  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const nowIso = new Date().toISOString();
 
   const [
     totalLeadsRes,
     urgentLeadsRes,
+    emergencyLeadsRes,
     newLeadsRes,
-    newCallsRes,
+    totalCallsRes,
     bookedAppointmentsRes,
     recentLeadsRes,
     recentCallsRes,
@@ -41,15 +42,18 @@ export default async function DashboardHomePage() {
       .from("leads")
       .select("*", { count: "exact", head: true })
       .eq("company_id", companyId)
-      .in("urgency", ["high", "emergency"])
-      .not("status", "eq", "Closed")
-      .not("status", "eq", "Lost"),
-    supabase.from("leads").select("*", { count: "exact", head: true }).eq("company_id", companyId).eq("status", "New"),
+      .eq("urgency", "high")
+      .not("status", "eq", "Lost")
+      .not("status", "eq", "Completed"),
     supabase
-      .from("calls")
+      .from("leads")
       .select("*", { count: "exact", head: true })
       .eq("company_id", companyId)
-      .gte("created_at", since24h),
+      .eq("urgency", "emergency")
+      .not("status", "eq", "Lost")
+      .not("status", "eq", "Completed"),
+    supabase.from("leads").select("*", { count: "exact", head: true }).eq("company_id", companyId).eq("status", "New"),
+    supabase.from("calls").select("*", { count: "exact", head: true }).eq("company_id", companyId),
     supabase
       .from("appointments")
       .select("*", { count: "exact", head: true })
@@ -72,8 +76,9 @@ export default async function DashboardHomePage() {
 
   const totalLeads = totalLeadsRes.count ?? 0;
   const urgentLeads = urgentLeadsRes.count ?? 0;
+  const emergencyLeads = emergencyLeadsRes.count ?? 0;
   const newLeads = newLeadsRes.count ?? 0;
-  const newCalls = newCallsRes.count ?? 0;
+  const totalCalls = totalCallsRes.count ?? 0;
   const bookedAppointments = bookedAppointmentsRes.count ?? 0;
   const recentLeads = (recentLeadsRes.data ?? []) as Lead[];
   const recentCalls = (recentCallsRes.data ?? []) as Call[];
@@ -85,13 +90,16 @@ export default async function DashboardHomePage() {
         <p className="mt-1 text-sm text-slate-600">Operational snapshot for your dispatch desk.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Total leads" value={totalLeads} />
-        <StatCard label="Urgent leads" value={urgentLeads} hint="High or emergency, excluding closed/lost." />
         <StatCard label="New leads" value={newLeads} hint='Status is "New".' />
-        <StatCard label="New calls (24h)" value={newCalls} />
+        <StatCard label="Urgent leads" value={urgentLeads} hint='Urgency "high", excluding Lost/Completed.' />
+        <StatCard label="Emergency leads" value={emergencyLeads} hint='Urgency "emergency", excluding Lost/Completed.' />
+        <StatCard label="Total calls" value={totalCalls} />
         <StatCard label="Booked appointments" value={bookedAppointments} hint="Scheduled visits with a future time." />
       </div>
+
+      <LoadDemoDataButton />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <RecentLeads leads={recentLeads} />

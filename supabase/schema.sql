@@ -1,11 +1,5 @@
--- FieldAI — full schema for Supabase (Postgres + Auth)
--- Paste into: Supabase Dashboard → SQL → New query → Run once on a fresh project.
--- Also kept in repo as the canonical reference (see supabase/migrations for incremental history).
---
--- After running this SQL and configuring .env.local:
--- 1) Sign up at /signup (creates Auth user + company + default ai_settings when email confirmation is off).
--- 2) In local dev, open /dashboard/settings → "Load Demo Data" (runs seed_demo_for_my_company(true)).
--- 3) Or POST sample payloads to /api/calls/webhook (requires SUPABASE_SERVICE_ROLE_KEY in .env.local).
+-- FieldAI — Supabase Postgres schema (public) + Auth integration
+-- Run in Supabase SQL Editor on a new project, or apply migrations incrementally.
 
 create extension if not exists "pgcrypto";
 
@@ -16,12 +10,16 @@ create extension if not exists "pgcrypto";
 create table if not exists public.companies (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  trade_type text,
+  industry text,
   phone text,
   owner_user_id uuid not null references auth.users (id) on delete cascade,
-  invite_token text not null default encode(gen_random_bytes(9), 'hex') unique,
-  created_at timestamptz not null default now()
+  invite_token text not null default encode(gen_random_bytes(9), 'hex'),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint companies_invite_token_key unique (invite_token)
 );
+
+create index if not exists idx_companies_owner on public.companies (owner_user_id);
 
 create table if not exists public.company_users (
   id uuid primary key default gen_random_uuid(),
@@ -35,8 +33,6 @@ create table if not exists public.company_users (
 create index if not exists idx_company_users_user on public.company_users (user_id);
 create index if not exists idx_company_users_company on public.company_users (company_id);
 
--- public.leads: id (default), company_id, customer_name, customer_phone, service_address,
--- issue_type, urgency, status (default 'New'), preferred_time, summary, transcript, created_at (default)
 create table if not exists public.leads (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies (id) on delete cascade,
@@ -49,18 +45,23 @@ create table if not exists public.leads (
   preferred_time text,
   summary text,
   transcript text,
-  created_at timestamptz not null default now()
+  source text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create index if not exists idx_leads_company on public.leads (company_id);
-create index if not exists idx_leads_created on public.leads (company_id, created_at desc);
+create index if not exists idx_leads_company_created on public.leads (company_id, created_at desc);
 
 create table if not exists public.calls (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies (id) on delete cascade,
   lead_id uuid references public.leads (id) on delete set null,
+  provider text,
+  provider_call_id text,
   caller_phone text,
   call_status text,
+  recording_url text,
   transcript text,
   summary text,
   urgency text,
@@ -70,7 +71,8 @@ create table if not exists public.calls (
 );
 
 create index if not exists idx_calls_company on public.calls (company_id);
-create index if not exists idx_calls_created on public.calls (company_id, created_at desc);
+create index if not exists idx_calls_company_created on public.calls (company_id, created_at desc);
+create index if not exists idx_calls_lead on public.calls (lead_id);
 
 create table if not exists public.appointments (
   id uuid primary key default gen_random_uuid(),
@@ -82,41 +84,31 @@ create table if not exists public.appointments (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_appt_company on public.appointments (company_id);
+create index if not exists idx_appointments_company on public.appointments (company_id);
+create index if not exists idx_appointments_time on public.appointments (company_id, appointment_time);
 
 create table if not exists public.ai_settings (
   id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies (id) on delete cascade unique,
+  company_id uuid not null references public.companies (id) on delete cascade,
   assistant_name text,
-  business_hours text,
-  emergency_rules text,
-  services_offered text,
   greeting text,
+  tone text,
+  business_hours text,
+  services_offered text,
+  intake_questions text,
+  urgency_rules text,
   fallback_instructions text,
+  transfer_phone text,
+  booking_instructions text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint ai_settings_company_id_key unique (company_id)
 );
 
 create index if not exists idx_ai_settings_company on public.ai_settings (company_id);
 
--- If upgrading an older DB without invite_token, add the column (safe to re-run).
-alter table public.companies
-  add column if not exists invite_token text;
-
-update public.companies
-set invite_token = encode(gen_random_bytes(9), 'hex')
-where invite_token is null;
-
-alter table public.companies
-  alter column invite_token set default encode(gen_random_bytes(9), 'hex');
-
-alter table public.companies
-  alter column invite_token set not null;
-
-create unique index if not exists companies_invite_token_key on public.companies (invite_token);
-
 -- ---------------------------------------------------------------------------
--- Triggers
+-- Triggers: updated_at
 -- ---------------------------------------------------------------------------
 
 create or replace function public.set_updated_at()
@@ -129,6 +121,18 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_companies_updated_at on public.companies;
+create trigger trg_companies_updated_at
+before update on public.companies
+for each row
+execute procedure public.set_updated_at();
+
+drop trigger if exists trg_leads_updated_at on public.leads;
+create trigger trg_leads_updated_at
+before update on public.leads
+for each row
+execute procedure public.set_updated_at();
+
 drop trigger if exists trg_ai_settings_updated_at on public.ai_settings;
 create trigger trg_ai_settings_updated_at
 before update on public.ai_settings
@@ -136,7 +140,7 @@ for each row
 execute procedure public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- Security helpers & RPCs
+-- Helpers & RPCs
 -- ---------------------------------------------------------------------------
 
 create or replace function public.is_company_member(p_company_id uuid)
@@ -159,7 +163,7 @@ grant execute on function public.is_company_member(uuid) to authenticated;
 
 create or replace function public.create_company_with_owner(
   p_name text,
-  p_trade_type text,
+  p_industry text,
   p_phone text
 )
 returns uuid
@@ -178,8 +182,8 @@ begin
     raise exception 'User already belongs to a company';
   end if;
 
-  insert into public.companies (name, trade_type, phone, owner_user_id)
-  values (p_name, nullif(p_trade_type, ''), nullif(p_phone, ''), auth.uid())
+  insert into public.companies (name, industry, phone, owner_user_id)
+  values (p_name, nullif(p_industry, ''), nullif(p_phone, ''), auth.uid())
   returning id into v_company_id;
 
   insert into public.company_users (company_id, user_id, role)
@@ -235,7 +239,7 @@ grant execute on function public.join_company_by_invite(text) to authenticated;
 drop function if exists public.seed_demo_for_my_company();
 drop function if exists public.seed_demo_for_my_company(boolean);
 
--- Demo dataset (4 leads + linked calls). p_append=true inserts even if leads already exist (dev UX).
+-- Demo dataset (multi-vertical). p_append=true always inserts more rows (dev).
 create or replace function public.seed_demo_for_my_company(p_append boolean default false)
 returns void
 language plpgsql
@@ -244,10 +248,7 @@ set search_path = public
 as $$
 declare
   v_company uuid;
-  v_l1 uuid;
-  v_l2 uuid;
-  v_l3 uuid;
-  v_l4 uuid;
+  v_l uuid;
   t0 timestamptz := now();
 begin
   if auth.uid() is null then
@@ -269,85 +270,58 @@ begin
     return;
   end if;
 
-  insert into public.leads (
-    company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript
-  ) values (
-    v_company,
-    'Alex Rivera',
-    '(916) 555-0142',
-    '1200 J St, Sacramento, CA',
-    'Emergency sewer backup',
-    'emergency',
-    'New',
-    'ASAP',
-    'Sewage backing up into bathtub and shower; strong odor; multiple fixtures affected.',
-    'Agent: Is water or sewage visible in the tub or shower?\nCaller: Yes — it came up after flushing.\nAgent: Please avoid using water and we will dispatch.'
-  ) returning id into v_l1;
+  -- HVAC emergency
+  insert into public.leads (company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript, source)
+  values (v_company, 'Riley Chen', '(415) 555-0101', '88 Market St, San Francisco, CA', 'No heat — furnace outage', 'emergency', 'New', 'Tonight', 'Furnace stopped working; home below 55°F; elderly resident.', 'Caller: heat went out this afternoon. Agent: triage for no-heat emergency.', 'demo_seed')
+  returning id into v_l;
+  insert into public.calls (company_id, lead_id, provider, provider_call_id, caller_phone, call_status, recording_url, transcript, summary, urgency, started_at, ended_at)
+  values (v_company, v_l, 'demo', 'demo-hvac-1', '(415) 555-0101', 'completed', null, 'Demo transcript: HVAC emergency triage.', 'No heat — elderly resident.', 'emergency', t0 - interval '2 hours', t0 - interval '110 minutes');
 
-  insert into public.leads (
-    company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript
-  ) values (
-    v_company,
-    'Sam Nguyen',
-    '(916) 555-0199',
-    '44 Oak Park Dr, Sacramento, CA',
-    'Slow drain',
-    'low',
-    'New',
-    'Any afternoon this week',
-    'Kitchen sink draining slowly; no backup yet; likely grease buildup.',
-    'Caller reports slow kitchen drain for ~2 weeks; disposal runs fine.'
-  ) returning id into v_l2;
+  -- Plumbing leak
+  insert into public.leads (company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript, source)
+  values (v_company, 'Morgan Diaz', '(415) 555-0102', '2200 Mission St, San Francisco, CA', 'Active ceiling leak', 'high', 'New', 'ASAP', 'Water stain spreading on ceiling under upstairs bath.', 'Caller reports dripping after shower use.', 'demo_seed')
+  returning id into v_l;
+  insert into public.calls (company_id, lead_id, provider, provider_call_id, caller_phone, call_status, recording_url, transcript, summary, urgency, started_at, ended_at)
+  values (v_company, v_l, 'demo', 'demo-plumb-1', '(415) 555-0102', 'completed', null, 'Demo transcript: leak intake.', 'Active ceiling leak.', 'high', t0 - interval '90 minutes', t0 - interval '80 minutes');
 
-  insert into public.leads (
-    company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript
-  ) values (
-    v_company,
-    'Jordan Kim',
-    '(916) 555-0177',
-    '901 River Rd, West Sacramento, CA',
-    'Camera inspection request',
-    'medium',
-    'Contacted',
-    'Friday morning',
-    'Homeowner wants mainline camera inspection before listing the home.',
-    'Caller wants recording and location notes for disclosure packet.'
-  ) returning id into v_l3;
+  -- Electrician estimate
+  insert into public.leads (company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript, source)
+  values (v_company, 'Alex Park', '(415) 555-0103', '450 Hayes St, San Francisco, CA', 'Panel upgrade estimate', 'medium', 'Contacted', 'Thursday PM', '200A service upgrade; wants ballpark before scheduling inspection.', 'Caller asks about timeline and permits.', 'demo_seed')
+  returning id into v_l;
+  insert into public.calls (company_id, lead_id, provider, provider_call_id, caller_phone, call_status, recording_url, transcript, summary, urgency, started_at, ended_at)
+  values (v_company, v_l, 'demo', 'demo-elec-1', '(415) 555-0103', 'completed', null, 'Demo transcript: estimate questions.', 'Panel upgrade estimate.', 'medium', t0 - interval '1 day', t0 - interval '1 day' + interval '12 minutes');
 
-  insert into public.leads (
-    company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript
-  ) values (
-    v_company,
-    'Taylor Brooks',
-    '(916) 555-0103',
-    '3001 Capitol Ave, Sacramento, CA',
-    'Trenchless replacement estimate',
-    'medium',
-    'New',
-    'Next Tuesday',
-    'Older clay lateral with root intrusion; interested in lining vs open-cut replacement.',
-    'Caller emailed prior photos; wants ballpark and onsite estimate.'
-  ) returning id into v_l4;
+  -- Roofing inspection
+  insert into public.leads (company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript, source)
+  values (v_company, 'Jordan Lee', '(415) 555-0104', '10 Sunset Blvd, Daly City, CA', 'Roof inspection before rain', 'high', 'New', 'Tomorrow morning', 'Missing shingles noted; wants inspection before forecasted storm.', 'Caller mentions recent wind event.', 'demo_seed')
+  returning id into v_l;
+  insert into public.calls (company_id, lead_id, provider, provider_call_id, caller_phone, call_status, recording_url, transcript, summary, urgency, started_at, ended_at)
+  values (v_company, v_l, 'demo', 'demo-roof-1', '(415) 555-0104', 'completed', null, 'Demo transcript: roof scheduling.', 'Roof inspection before rain.', 'high', t0 - interval '30 minutes', t0 - interval '20 minutes');
 
-  insert into public.calls (company_id, lead_id, caller_phone, call_status, transcript, summary, urgency, started_at, ended_at)
-  values
-    (v_company, v_l1, '(916) 555-0142', 'completed',
-     'Full transcript: emergency triage completed; advised to stop water use.',
-     'Emergency sewer backup — multiple fixtures affected.', 'emergency', t0 - interval '40 minutes', t0 - interval '32 minutes'),
-    (v_company, v_l2, '(916) 555-0199', 'completed',
-     'Full transcript: slow drain intake; scheduled routine service window.',
-     'Slow kitchen drain — likely grease.', 'low', t0 - interval '6 hours', t0 - interval '5 hours 50 minutes'),
-    (v_company, v_l3, '(916) 555-0177', 'completed',
-     'Full transcript: camera inspection scope confirmed.',
-     'Pre-listing camera inspection request.', 'medium', t0 - interval '2 days', t0 - interval '2 days' + interval '8 minutes'),
-    (v_company, v_l4, '(916) 555-0103', 'completed',
-     'Full transcript: trenchless options explained at high level.',
-     'Trenchless replacement estimate request.', 'medium', t0 - interval '30 minutes', t0 - interval '22 minutes');
+  -- Landscaping quote
+  insert into public.leads (company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript, source)
+  values (v_company, 'Sam Rivera', '(415) 555-0105', '1200 El Camino Real, Burlingame, CA', 'Weekly maintenance + spring cleanup', 'low', 'New', 'Any weekday morning', 'Residential lot ~4k sq ft; wants recurring service.', 'Caller asks about organic options.', 'demo_seed')
+  returning id into v_l;
+  insert into public.calls (company_id, lead_id, provider, provider_call_id, caller_phone, call_status, recording_url, transcript, summary, urgency, started_at, ended_at)
+  values (v_company, v_l, 'demo', 'demo-land-1', '(415) 555-0105', 'completed', null, 'Demo transcript: maintenance quote.', 'Landscaping quote.', 'low', t0 - interval '3 hours', t0 - interval '175 minutes');
+
+  -- Med spa appointment
+  insert into public.leads (company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript, source)
+  values (v_company, 'Taylor Brooks', '(415) 555-0106', '500 Union Square, San Francisco, CA', 'Hydrafacial — first visit', 'low', 'New', 'Saturday 10am', 'New client; sensitive skin; wants consultation slot.', 'Caller asks about contraindications.', 'demo_seed')
+  returning id into v_l;
+  insert into public.calls (company_id, lead_id, provider, provider_call_id, caller_phone, call_status, recording_url, transcript, summary, urgency, started_at, ended_at)
+  values (v_company, v_l, 'demo', 'demo-spa-1', '(415) 555-0106', 'completed', null, 'Demo transcript: booking intake.', 'Med spa first visit.', 'low', t0 - interval '6 hours', t0 - interval '350 minutes');
+
+  -- Cleaning request
+  insert into public.leads (company_id, customer_name, customer_phone, service_address, issue_type, urgency, status, preferred_time, summary, transcript, source)
+  values (v_company, 'Casey Nguyen', '(415) 555-0107', '900 Bush St, San Francisco, CA', 'Move-out deep clean (2BR)', 'medium', 'New', 'End of month', 'Moving out 6/30; needs deep clean + oven/fridge.', 'Caller asks for eco products.', 'demo_seed')
+  returning id into v_l;
+  insert into public.calls (company_id, lead_id, provider, provider_call_id, caller_phone, call_status, recording_url, transcript, summary, urgency, started_at, ended_at)
+  values (v_company, v_l, 'demo', 'demo-clean-1', '(415) 555-0107', 'completed', null, 'Demo transcript: scope and pricing.', 'Move-out deep clean.', 'medium', t0 - interval '45 minutes', t0 - interval '35 minutes');
 
   insert into public.appointments (company_id, lead_id, appointment_time, notes, status)
   values
-    (v_company, v_l3, t0 + interval '3 days', 'Camera inspection — homeowner will meet onsite.', 'scheduled'),
-    (v_company, v_l4, t0 + interval '5 days', 'Estimate visit for lining vs replacement options.', 'scheduled');
+    (v_company, v_l, t0 + interval '4 days', 'Deep clean — confirm eco product list.', 'scheduled');
 end;
 $$;
 
@@ -425,19 +399,3 @@ drop policy if exists ai_update on public.ai_settings;
 create policy ai_update on public.ai_settings for update using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
 drop policy if exists ai_delete on public.ai_settings;
 create policy ai_delete on public.ai_settings for delete using (public.is_company_member(company_id));
-
--- ---------------------------------------------------------------------------
--- Optional static demo seed (requires real auth.users UUIDs — not runnable as-is)
--- ---------------------------------------------------------------------------
--- After you create a test user in Authentication, you can link demo rows by
--- replacing OWNER_UUID and COMPANY_UUID below, then uncomment and run.
---
--- insert into public.companies (id, name, trade_type, phone, owner_user_id)
--- values ('COMPANY_UUID', 'Demo Trenchless Co.', 'trenchless_sewer', '(916) 555-0100', 'OWNER_UUID');
---
--- insert into public.company_users (company_id, user_id, role)
--- values ('COMPANY_UUID', 'OWNER_UUID', 'owner');
---
--- insert into public.ai_settings (company_id, assistant_name, business_hours)
--- values ('COMPANY_UUID', 'Alex', 'Mon–Fri 7am–6pm')
--- on conflict (company_id) do nothing;

@@ -32,6 +32,7 @@ export function RecentLeads({ leads }: { leads: Lead[] }) {
                 <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                   {lead.status}
                 </span>
+                {lead.source ? <p className="mt-1 text-xs text-slate-500">Source: {lead.source}</p> : null}
                 {lead.urgency ? (
                   <p className="mt-1 text-xs capitalize text-slate-500">{lead.urgency}</p>
                 ) : null}

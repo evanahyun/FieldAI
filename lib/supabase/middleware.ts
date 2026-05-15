@@ -13,6 +13,8 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const isHttps = request.nextUrl.protocol === "https:";
+
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {
@@ -24,7 +26,12 @@ export async function updateSession(request: NextRequest) {
           request,
         });
         cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options),
+          supabaseResponse.cookies.set(name, value, {
+            ...options,
+            path: "/",
+            sameSite: "lax",
+            secure: isHttps,
+          }),
         );
       },
     },
@@ -41,13 +48,6 @@ export async function updateSession(request: NextRequest) {
   const isOnboarding = path.startsWith("/onboarding");
   const isDevTools = path.startsWith("/dev");
 
-  if (isOnboarding) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/signup";
-    redirectUrl.searchParams.set("setup", "company");
-    return NextResponse.redirect(redirectUrl);
-  }
-
   if (process.env.NODE_ENV === "production" && isDevTools) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
@@ -60,22 +60,33 @@ export async function updateSession(request: NextRequest) {
     return data;
   }
 
-  if (isLogin && user) {
-    const m = await membership();
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = m ? "/dashboard" : "/signup";
-    if (!m) redirectUrl.searchParams.set("setup", "company");
-    return NextResponse.redirect(redirectUrl);
-  }
+  const m = user ? await membership() : null;
 
-  if (isSignup && user) {
-    const m = await membership();
+  if (isOnboarding) {
+    if (!user) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      redirectUrl.searchParams.set("redirect", "/onboarding");
+      return NextResponse.redirect(redirectUrl);
+    }
     if (m) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/dashboard";
       return NextResponse.redirect(redirectUrl);
     }
-    // Logged in without a company: allow /signup to finish workspace setup.
+    return supabaseResponse;
+  }
+
+  if (isLogin && user) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = m ? "/dashboard" : "/onboarding";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (isSignup && user && m) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    return NextResponse.redirect(redirectUrl);
   }
 
   if (isDashboard && !user) {
@@ -85,14 +96,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isDashboard && user) {
-    const m = await membership();
-    if (!m) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/signup";
-      redirectUrl.searchParams.set("setup", "company");
-      return NextResponse.redirect(redirectUrl);
-    }
+  if (isDashboard && user && !m) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/onboarding";
+    return NextResponse.redirect(redirectUrl);
   }
 
   return supabaseResponse;

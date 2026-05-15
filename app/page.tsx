@@ -30,9 +30,10 @@ export default function HomePage() {
             Never miss another emergency call.
           </h1>
           <p className="text-lg leading-relaxed text-slate-600">
-            FieldAI is an AI front desk for plumbing, trenchless sewer, HVAC, and blue-collar field service
-            companies. It answers calls, captures structured job details, flags true emergencies, and routes
-            qualified leads straight to your dashboard.
+            FieldAI is an AI front desk and lead workspace for local service businesses: plumbers, HVAC, electrical,
+            roofing, landscaping, cleaners, contractors, med spas, auto shops, wellness studios, and more. It answers
+            calls, captures structured job details, flags true emergencies, and routes qualified leads to your
+            dashboard.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
