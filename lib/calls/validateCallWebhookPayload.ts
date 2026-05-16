@@ -1,6 +1,11 @@
 import type { CallWebhookPayload, Urgency } from "@/lib/types/database";
 
-const URGENCY_LEVELS: Urgency[] = ["low", "medium", "high", "emergency"];
+const URGENCY_LEVELS: Urgency[] = ["general inquiry", "scheduled", "same-day", "emergency"];
+const LEGACY_URGENCY_MAP: Record<string, Urgency> = {
+  low: "general inquiry",
+  medium: "scheduled",
+  high: "same-day",
+};
 
 export type ValidatePayloadResult =
   | { ok: true; payload: CallWebhookPayload }
@@ -14,8 +19,12 @@ export function validateCallWebhookPayload(json: Record<string, unknown>): Valid
   const customer_name = json.customer_name;
   const service_address = json.service_address;
   const issue_type = json.issue_type;
+  const service_category = json.service_category;
+  const problem_description = json.problem_description;
   const urgency = json.urgency;
   const preferred_time = json.preferred_time;
+  const appointment_request = json.appointment_request;
+  const internal_notes = json.internal_notes;
   const summary = json.summary;
   const transcript = json.transcript;
   const recording_url = json.recording_url;
@@ -40,7 +49,17 @@ export function validateCallWebhookPayload(json: Record<string, unknown>): Valid
     return { ok: false, status: 400, error: "Missing required fields", fields: missing };
   }
 
-  const p = json as unknown as CallWebhookPayload;
+  const normalizedUrgency =
+    typeof urgency === "string" && urgency in LEGACY_URGENCY_MAP ? LEGACY_URGENCY_MAP[urgency] : urgency;
+
+  const p = {
+    ...json,
+    urgency: normalizedUrgency,
+    service_category: typeof service_category === "string" ? service_category : issue_type,
+    problem_description: typeof problem_description === "string" ? problem_description : summary,
+    appointment_request: typeof appointment_request === "string" ? appointment_request : preferred_time,
+    internal_notes: typeof internal_notes === "string" ? internal_notes : "",
+  } as unknown as CallWebhookPayload;
 
   if (!URGENCY_LEVELS.includes(p.urgency)) {
     return { ok: false, status: 400, error: "Invalid urgency", fields: ["urgency"], allowed: URGENCY_LEVELS };

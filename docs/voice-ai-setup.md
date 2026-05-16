@@ -1,6 +1,6 @@
-# Voice AI setup (Vapi-first)
+# Phone integration setup (Vapi-first)
 
-FieldAI stores **leads** and **calls** in Supabase when a call completes. The AI phone stack runs in **Vapi** (or any provider that can POST JSON); FieldAI is the CRM / dispatch backend.
+FieldAI stores **leads** and **calls** in Supabase when a call completes. The phone-answering stack runs through **Vapi** (or any provider that can send call events); FieldAI is the front desk, lead intake, and scheduling backend.
 
 ## Behavioral prompt vs. operator setup
 

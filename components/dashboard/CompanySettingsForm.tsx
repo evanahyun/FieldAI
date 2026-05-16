@@ -33,7 +33,7 @@ export function CompanySettingsForm({
     <form action={action} className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-base font-semibold text-slate-900">Company profile</h2>
-        <p className="mt-1 text-sm text-slate-600">Used across your dashboard and AI receptionist context.</p>
+        <p className="mt-1 text-sm text-slate-600">Used across your dashboard, call intake, and scheduling rules.</p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="name">

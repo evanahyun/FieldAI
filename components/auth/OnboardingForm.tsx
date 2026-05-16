@@ -59,7 +59,7 @@ export function OnboardingForm() {
   return (
     <AuthCard
       title="Set up your company"
-      subtitle="Tell us the basics so your AI receptionist and dashboard are scoped correctly."
+      subtitle="Tell us the basics so call intake and your dashboard are set up correctly."
     >
       <form className="space-y-4" onSubmit={onSubmit}>
         <div>

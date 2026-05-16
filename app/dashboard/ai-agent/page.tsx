@@ -31,16 +31,15 @@ export default async function AiAgentPage() {
     return <p className="text-sm text-red-600">Could not load company: {cErr?.message ?? "Unknown"}</p>;
   }
   if (aErr) {
-    return <p className="text-sm text-red-600">Could not load AI settings: {aErr.message}</p>;
+    return <p className="text-sm text-red-600">Could not load front desk settings: {aErr.message}</p>;
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Phone receptionist</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Front desk rules</h1>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
-          Set your business rules once. FieldAI handles calls and updates your dashboard automatically—you do not need to
-          write or edit a technical prompt.
+          Set your business rules once. FieldAI handles calls and updates your dashboard automatically.
         </p>
       </div>
       <AiAgentSettingsForm company={company as Company} initialAi={ai as AiSettings | null} />

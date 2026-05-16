@@ -20,6 +20,7 @@ Apply in order (skip any you already ran; each file uses `if not exists` where p
 | `0002_invite_token_join_seed.sql` | `invite_token`, join RPC, first demo seed |
 | `0003_fieldai_saas_columns.sql` | `industry`, `ai_settings` new columns, calls metadata, RPC `p_industry`, new demo seed |
 | `0004_post_drift_fix.sql` | Invite-token backfill if 0002 was skipped + **PostgREST schema reload** |
+| `0005_intake_pipeline_fields.sql` | Service category, problem description, appointment request, and internal notes for call intake |
 
 After **any** DDL change, if the app still errors on a column that **does** exist in the Table Editor, run **`0004_post_drift_fix.sql`** (or at least the final `notify pgrst, 'reload schema';` line) so the API layer picks up the new columns.
 

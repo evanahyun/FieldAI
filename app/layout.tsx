@@ -11,9 +11,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "FieldAI — AI front desk for field service",
+  title: "FieldAI — Front desk for service businesses",
   description:
-    "AI-qualified leads from phone calls for plumbing, trenchless sewer, HVAC, and blue-collar field service teams.",
+    "Call answering, lead capture, scheduling, and missed-call recovery for plumbing, HVAC, electrical, roofing, and local service teams.",
 };
 
 export default function RootLayout({

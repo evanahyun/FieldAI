@@ -52,7 +52,7 @@ export function LoadDemoDataButton() {
       </button>
       <p className="mt-2 text-xs">
         <a href="/dev/test-call" className="font-semibold text-accent hover:underline">
-          Open fake call webhook tester →
+          Open inbound call tester →
         </a>
       </p>
     </div>

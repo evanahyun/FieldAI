@@ -11,8 +11,12 @@ type Payload = {
   customer_name: string;
   service_address: string;
   issue_type: string;
-  urgency: "low" | "medium" | "high" | "emergency";
+  service_category?: string;
+  problem_description?: string;
+  urgency: "general inquiry" | "scheduled" | "same-day" | "emergency";
   preferred_time: string;
+  appointment_request?: string;
+  internal_notes?: string;
   summary: string;
   transcript: string;
   recording_url: string;
@@ -28,8 +32,12 @@ function defaultPayload(companyId: string): Payload {
     customer_name: "Test Caller",
     service_address: "123 Market St, San Francisco, CA",
     issue_type: "Test intake — water heater noise",
-    urgency: "medium",
+    service_category: "plumbing",
+    problem_description: "Customer reports intermittent rumbling from the water heater for two days.",
+    urgency: "scheduled",
     preferred_time: "Tomorrow afternoon",
+    appointment_request: "Customer wants an appointment tomorrow afternoon.",
+    internal_notes: "No visible leak reported. Confirm water heater age during follow-up.",
     summary: "Test webhook call: customer reports intermittent rumbling from water heater.",
     transcript: "Agent: How long has the noise been happening?\nCaller: About two days.\nAgent: Any leaks visible?\nCaller: Not yet.",
     recording_url: "",
@@ -52,7 +60,29 @@ export default function TestCallForm({ companyId }: { companyId: string }) {
     }
   }, [jsonText]);
 
-  async function send() {
+  function asMockVapiEvent(payload: Payload) {
+    return {
+      message: {
+        type: "end-of-call-report",
+        endedReason: payload.call_status,
+        call: {
+          id: payload.provider_call_id,
+          status: payload.call_status,
+          startedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+          endedAt: new Date().toISOString(),
+          customer: { number: payload.caller_phone },
+          metadata: { company_id: payload.company_id },
+        },
+        summary: payload.summary,
+        artifact: {
+          transcript: payload.transcript,
+          recording: {},
+        },
+      },
+    };
+  }
+
+  async function send(target: "generic" | "vapi") {
     setResult(null);
     setLeadLink(null);
     if (!parsed) {
@@ -65,10 +95,10 @@ export default function TestCallForm({ companyId }: { companyId: string }) {
       if (webhookSecret.trim()) {
         headers.Authorization = `Bearer ${webhookSecret.trim()}`;
       }
-      const res = await fetch("/api/calls/webhook", {
+      const res = await fetch(target === "generic" ? "/api/calls/webhook" : "/api/vapi/webhook", {
         method: "POST",
         headers,
-        body: JSON.stringify(parsed),
+        body: JSON.stringify(target === "generic" ? parsed : asMockVapiEvent(parsed)),
       });
       const text = await res.text();
       setResult(`${res.status} ${res.statusText}\n${text}`);
@@ -88,11 +118,11 @@ export default function TestCallForm({ companyId }: { companyId: string }) {
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Test call webhook</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Test inbound call</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Sends a POST to <code className="rounded bg-slate-100 px-1 text-xs">/api/calls/webhook</code> as{" "}
-          <code className="rounded bg-slate-100 px-1 text-xs">vapi</code> would. Company ID is pre-filled from your
-          logged-in workspace.
+          Send a sample call into the local intake flow. Company ID is pre-filled from your logged-in workspace. When
+          <code className="ml-1 rounded bg-slate-100 px-1 text-xs">VAPI_WEBHOOK_SECRET</code> is not set locally, the Vapi
+          test endpoint accepts requests without a secret.
         </p>
         <p className="mt-2 text-sm">
           <Link href="/dashboard" className="font-semibold text-accent hover:underline">
@@ -111,14 +141,14 @@ export default function TestCallForm({ companyId }: { companyId: string }) {
           autoComplete="off"
           value={webhookSecret}
           onChange={(e) => setWebhookSecret(e.target.value)}
-          placeholder="If CALLS_WEBHOOK_SECRET is set"
+                placeholder="If a webhook secret is set"
           className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none ring-accent focus:ring-2"
         />
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <label className="text-sm font-medium text-slate-700" htmlFor="payload">
-          JSON body
+          Sample call details
         </label>
         <textarea
           id="payload"
@@ -129,11 +159,19 @@ export default function TestCallForm({ companyId }: { companyId: string }) {
         />
         <button
           type="button"
-          onClick={send}
+          onClick={() => send("generic")}
           disabled={loading}
           className="mt-4 w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 disabled:opacity-60"
         >
-          {loading ? "Sending…" : "Send test webhook"}
+          {loading ? "Sending…" : "Send generic test call"}
+        </button>
+        <button
+          type="button"
+          onClick={() => send("vapi")}
+          disabled={loading}
+          className="mt-3 w-full rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+        >
+          {loading ? "Sending…" : "Simulate Vapi end-of-call"}
         </button>
         {result ? (
           <pre className="mt-4 max-h-64 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">

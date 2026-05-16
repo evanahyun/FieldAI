@@ -38,13 +38,12 @@ export default async function CallsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Calls</h1>
-        <p className="mt-1 text-sm text-slate-600">History of AI-handled phone sessions for your company.</p>
+        <p className="mt-1 text-sm text-slate-600">Answered, missed, and recovered calls for your company.</p>
       </div>
 
       {calls.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-600">
-          No calls yet. Wire your voice agent to POST completed calls to{" "}
-          <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/calls/webhook</code>
+          No calls yet. Connect your phone line or use the local test page to simulate an inbound call.
           {process.env.NODE_ENV === "development" ? (
             <>
               {" "}
@@ -64,7 +63,7 @@ export default async function CallsPage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{call.caller_phone ?? "—"}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Provider: <span className="font-medium text-slate-700">{call.provider ?? "—"}</span>
+                    Source: <span className="font-medium text-slate-700">{call.provider ?? "—"}</span>
                     {call.provider_call_id ? (
                       <>
                         {" "}
@@ -75,6 +74,15 @@ export default async function CallsPage() {
                   <p className="mt-1 text-xs text-slate-500">
                     Status: <span className="font-medium text-slate-700">{call.call_status ?? "—"}</span> · Urgency:{" "}
                     <span className="font-medium capitalize text-slate-700">{call.urgency ?? "—"}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Service: <span className="font-medium capitalize text-slate-700">{call.service_category ?? "—"}</span>
+                    {call.appointment_request ? (
+                      <>
+                        {" "}
+                        · Appointment: <span className="font-medium text-slate-700">{call.appointment_request}</span>
+                      </>
+                    ) : null}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     Started: {call.started_at ? new Date(call.started_at).toLocaleString() : "—"} · Ended:{" "}
@@ -107,6 +115,12 @@ export default async function CallsPage() {
               <div className="mt-4 border-t border-slate-100 pt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Summary</p>
                 <p className="mt-1 text-sm text-slate-800">{call.summary ?? "—"}</p>
+                {call.internal_notes ? (
+                  <>
+                    <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">Office notes</p>
+                    <p className="mt-1 text-sm text-slate-800">{call.internal_notes}</p>
+                  </>
+                ) : null}
               </div>
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Transcript</p>

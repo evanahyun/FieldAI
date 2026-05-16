@@ -1,6 +1,6 @@
-export type Urgency = "low" | "medium" | "high" | "emergency";
+export type Urgency = "general inquiry" | "scheduled" | "same-day" | "emergency";
 
-export type LeadStatus = "New" | "Contacted" | "Qualified" | "Booked" | "Completed" | "Lost";
+export type LeadStatus = "new" | "qualified" | "booked" | "awaiting confirmation" | "needs follow-up" | "follow-up" | "missed" | "closed";
 
 export interface Company {
   id: string;
@@ -28,9 +28,13 @@ export interface Lead {
   customer_phone: string | null;
   service_address: string | null;
   issue_type: string | null;
+  service_category?: string | null;
+  problem_description?: string | null;
   urgency: string | null;
   status: string;
   preferred_time: string | null;
+  appointment_request?: string | null;
+  internal_notes?: string | null;
   summary: string | null;
   transcript: string | null;
   source: string | null;
@@ -45,9 +49,13 @@ export interface LeadInsert {
   customer_phone?: string | null;
   service_address?: string | null;
   issue_type?: string | null;
+  service_category?: string | null;
+  problem_description?: string | null;
   urgency?: string | null;
   status?: string;
   preferred_time?: string | null;
+  appointment_request?: string | null;
+  internal_notes?: string | null;
   summary?: string | null;
   transcript?: string | null;
   source?: string | null;
@@ -67,6 +75,9 @@ export interface Call {
   transcript: string | null;
   summary: string | null;
   urgency: string | null;
+  service_category?: string | null;
+  appointment_request?: string | null;
+  internal_notes?: string | null;
   started_at: string | null;
   ended_at: string | null;
   created_at: string;
@@ -84,6 +95,9 @@ export interface CallInsert {
   transcript?: string | null;
   summary?: string | null;
   urgency?: string | null;
+  service_category?: string | null;
+  appointment_request?: string | null;
+  internal_notes?: string | null;
   started_at?: string | null;
   ended_at?: string | null;
   created_at?: string;
@@ -125,8 +139,12 @@ export interface CallWebhookPayload {
   customer_name: string;
   service_address: string;
   issue_type: string;
+  service_category?: string;
+  problem_description?: string;
   urgency: Urgency;
   preferred_time: string;
+  appointment_request?: string;
+  internal_notes?: string;
   summary: string;
   transcript: string;
   recording_url: string;

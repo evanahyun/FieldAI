@@ -19,7 +19,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <Link href="/" className="text-lg font-semibold tracking-tight text-slate-900">
                 FieldAI
               </Link>
-              <p className="mt-1 text-xs text-slate-500">AI front desk</p>
+              <p className="mt-1 text-xs text-slate-500">Call intake desk</p>
             </div>
             <nav className="space-y-1">
               {links.map((l) => (

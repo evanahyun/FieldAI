@@ -109,7 +109,7 @@ export function AiAgentSettingsForm({
                 Name and industry are edited under Dashboard → Settings.
               </p>
             </div>
-            <Field id="assistant_name" label="Assistant / persona name">
+            <Field id="assistant_name" label="Front desk name">
               <input
                 id="assistant_name"
                 name="assistant_name"

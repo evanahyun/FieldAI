@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPrimaryCompanyId } from "@/lib/company";
 import type { LeadStatus } from "@/lib/types/database";
 
-const ALLOWED: LeadStatus[] = ["New", "Contacted", "Qualified", "Booked", "Completed", "Lost"];
+const ALLOWED: LeadStatus[] = ["new", "qualified", "booked", "awaiting confirmation", "needs follow-up", "follow-up", "missed", "closed"];
 
 export async function updateLeadStatus(
   leadId: string,

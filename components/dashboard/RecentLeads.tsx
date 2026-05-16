@@ -5,7 +5,7 @@ export function RecentLeads({ leads }: { leads: Lead[] }) {
   if (!leads.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-600">
-        No leads yet. When your AI phone agent posts to the webhook, new leads will appear here.
+        No leads yet. New call intakes will appear here as soon as they are captured.
       </div>
     );
   }
@@ -26,7 +26,7 @@ export function RecentLeads({ leads }: { leads: Lead[] }) {
                 <p className="text-sm font-semibold text-slate-900">
                   {lead.customer_name ?? "Unknown caller"}
                 </p>
-                <p className="text-xs text-slate-500">{lead.issue_type ?? "General intake"}</p>
+                <p className="text-xs text-slate-500">{lead.service_category ?? lead.issue_type ?? "General intake"}</p>
               </div>
               <div className="text-right">
                 <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">

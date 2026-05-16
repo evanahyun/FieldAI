@@ -5,7 +5,7 @@ export function RecentCalls({ calls }: { calls: Call[] }) {
   if (!calls.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-600">
-        No calls logged yet. Completed AI calls will show transcripts and summaries here.
+        No calls logged yet. Answered calls will show summaries and follow-up details here.
       </div>
     );
   }
@@ -21,6 +21,9 @@ export function RecentCalls({ calls }: { calls: Call[] }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-slate-900">{call.caller_phone ?? "Unknown number"}</p>
+                <p className="mt-1 text-xs font-medium capitalize text-slate-500">
+                  {call.service_category ?? "general service"} · {call.urgency ?? "general inquiry"}
+                </p>
                 <p className="mt-1 line-clamp-2 text-xs text-slate-600">{call.summary ?? "No summary"}</p>
               </div>
               <div className="shrink-0 text-right">

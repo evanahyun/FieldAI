@@ -58,7 +58,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
             {lead.customer_name ?? "Unknown customer"}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">{lead.issue_type ?? "General intake"}</p>
+          <p className="mt-1 text-sm text-slate-600">{lead.service_category ?? lead.issue_type ?? "General intake"}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <LeadStatusForm key={`${lead.id}-${lead.status}`} leadId={lead.id} initialStatus={lead.status} />
@@ -82,6 +82,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <dd className="font-medium text-slate-900">{lead.preferred_time ?? "—"}</dd>
             </div>
             <div>
+              <dt className="text-slate-500">Appointment request</dt>
+              <dd className="font-medium text-slate-900">{lead.appointment_request ?? "—"}</dd>
+            </div>
+            <div>
               <dt className="text-slate-500">Source</dt>
               <dd className="font-medium text-slate-900">{lead.source ?? "—"}</dd>
             </div>
@@ -98,6 +102,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <div>
               <dt className="text-slate-500">Issue type</dt>
               <dd className="font-medium text-slate-900">{lead.issue_type ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Service category</dt>
+              <dd className="font-medium capitalize text-slate-900">{lead.service_category ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Problem description</dt>
+              <dd className="font-medium text-slate-900">{lead.problem_description ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Created</dt>
@@ -151,6 +163,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <div className="mt-4 border-t border-slate-100 pt-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Call summary</p>
               <p className="mt-1 text-sm text-slate-800">{call.summary ?? "—"}</p>
+              {call.internal_notes ? (
+                <>
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">Office notes</p>
+                  <p className="mt-1 text-sm text-slate-800">{call.internal_notes}</p>
+                </>
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -158,6 +176,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
           <h2 className="text-sm font-semibold text-slate-900">Summary</h2>
           <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{lead.summary ?? "—"}</p>
+          {lead.internal_notes ? (
+            <>
+              <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500">Internal notes</h3>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{lead.internal_notes}</p>
+            </>
+          ) : null}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">

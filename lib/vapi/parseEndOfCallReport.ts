@@ -92,6 +92,7 @@ export type ParsedVapiEndOfCall = {
   transcript: string;
   recording_url: string;
   summary_hint: string;
+  call_status: string;
   started_at: string | null;
   ended_at: string | null;
 };
@@ -148,6 +149,9 @@ export function parseVapiEndOfCallReport(body: unknown): { ok: true; data: Parse
   const endedRaw = call.endedAt ?? call.updatedAt;
   const started_at = typeof startedRaw === "string" && startedRaw ? startedRaw : null;
   const ended_at = typeof endedRaw === "string" && endedRaw ? endedRaw : null;
+  const endedReason = typeof msg.endedReason === "string" ? msg.endedReason : "";
+  const status = typeof call.status === "string" ? call.status : "";
+  const call_status = endedReason || status || "completed";
 
   return {
     ok: true,
@@ -158,6 +162,7 @@ export function parseVapiEndOfCallReport(body: unknown): { ok: true; data: Parse
       transcript: transcript || summary_hint,
       recording_url: pickRecordingUrl(msg),
       summary_hint,
+      call_status,
       started_at,
       ended_at,
     },

@@ -38,7 +38,7 @@ export default async function LeadsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Leads</h1>
-        <p className="mt-1 text-sm text-slate-600">Every AI-qualified job intake tied to your company.</p>
+        <p className="mt-1 text-sm text-slate-600">Job opportunities captured from calls, after-hours messages, and follow-ups.</p>
       </div>
       <LeadsTable leads={leads} />
     </div>

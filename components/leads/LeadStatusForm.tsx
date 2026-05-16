@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { LeadStatus } from "@/lib/types/database";
 import { updateLeadStatus } from "@/app/dashboard/leads/[id]/actions";
 
-const statuses: LeadStatus[] = ["New", "Contacted", "Qualified", "Booked", "Completed", "Lost"];
+const statuses: LeadStatus[] = ["new", "qualified", "booked", "awaiting confirmation", "needs follow-up", "follow-up", "missed", "closed"];
 
 export function LeadStatusForm({ leadId, initialStatus }: { leadId: string; initialStatus: string }) {
   const [pending, startTransition] = useTransition();
@@ -25,7 +25,7 @@ export function LeadStatusForm({ leadId, initialStatus }: { leadId: string; init
     });
   }
 
-  const safeInitial = statuses.includes(initialStatus as LeadStatus) ? initialStatus : "New";
+  const safeInitial = statuses.includes(initialStatus as LeadStatus) ? initialStatus : "new";
 
   return (
     <div className="space-y-2">
@@ -41,7 +41,7 @@ export function LeadStatusForm({ leadId, initialStatus }: { leadId: string; init
       >
         {statuses.map((s) => (
           <option key={s} value={s}>
-            {s}
+            {s.replace("-", " ")}
           </option>
         ))}
       </select>
