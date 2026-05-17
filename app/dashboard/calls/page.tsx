@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { tryCreateClient } from "@/lib/supabase/server";
-import { getPrimaryCompanyId } from "@/lib/company";
+import { getDashboardCompanyContext } from "@/lib/company";
 import { SupabaseConfigError } from "@/components/dashboard/SupabaseConfigError";
 import type { Call } from "@/lib/types/database";
 
@@ -17,22 +17,29 @@ export default async function CallsPage() {
     return null;
   }
 
-  const companyId = await getPrimaryCompanyId(supabase, user.id);
+  const { companyId, queryClient } = await getDashboardCompanyContext(supabase, user.id);
   if (!companyId) {
     return null;
   }
 
-  const { data, error } = await supabase
+  console.info(`[dashboard] using company_id: ${companyId}`);
+
+  const [{ data, error }, leadsCountRes] = await Promise.all([
+    queryClient
     .from("calls")
     .select("*")
     .eq("company_id", companyId)
-    .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }),
+    queryClient.from("leads").select("*", { count: "exact", head: true }).eq("company_id", companyId),
+  ]);
 
   if (error) {
     return <p className="text-sm text-red-600">Could not load calls: {error.message}</p>;
   }
 
   const calls = (data ?? []) as Call[];
+  console.info(`[dashboard] leads count: ${leadsCountRes.count ?? 0}`);
+  console.info(`[dashboard] calls count: ${calls.length}`);
 
   return (
     <div className="space-y-6">

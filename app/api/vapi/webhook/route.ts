@@ -113,16 +113,22 @@ function statusFromEvent(event: Record<string, unknown>, call: Record<string, un
 function isTerminalVapiEvent(event: Record<string, unknown>, call: Record<string, unknown> | null): boolean {
   const type = stringValue(event.type);
   const status = statusFromEvent(event, call).toLowerCase();
-  const analysis = isRecord(event.analysis) || Boolean(call && isRecord(call.analysis));
-  return (
-    type === "end-of-call-report" ||
-    type === "call-ended" ||
-    (type === "status-update" && ["ended", "completed", "complete"].includes(status)) ||
-    Boolean(stringValue(event.endedReason)) ||
-    analysis ||
-    Boolean(summaryFromEvent(event, call)) ||
-    Boolean(transcriptFromEvent(event))
-  );
+  const skippedTypes = ["conversation-update", "transcript", "speech-update", "assistant.started"];
+  const completedStatuses = ["ended", "completed", "complete", "customer-ended-call", "assistant-ended-call"];
+
+  if (type === "end-of-call-report" || type === "call-ended") {
+    return true;
+  }
+
+  if (type === "status-update") {
+    return completedStatuses.includes(status);
+  }
+
+  if (skippedTypes.includes(type)) {
+    return false;
+  }
+
+  return false;
 }
 
 function rawPayloadNote(body: Record<string, unknown>, endedReason: string): string {
@@ -188,9 +194,15 @@ export async function POST(request: Request) {
 
   console.info(`[vapi-webhook] event type: ${msgType}`);
 
-  if (!isTerminalVapiEvent(event, call)) {
+  const isTerminal = isTerminalVapiEvent(event, call);
+  console.info("[vapi-webhook] terminal decision", { type: msgType, status, isTerminal });
+
+  if (!isTerminal) {
+    console.info("[vapi-webhook] non-terminal event; skipping save");
     return NextResponse.json({ ok: true, ignored: msgType, terminal: false });
   }
+
+  console.info("[vapi-webhook] terminal event; saving call intake");
 
   let admin;
   try {

@@ -1,5 +1,5 @@
 import { tryCreateClient } from "@/lib/supabase/server";
-import { getPrimaryCompanyId } from "@/lib/company";
+import { getDashboardCompanyContext } from "@/lib/company";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { RecentLeads } from "@/components/dashboard/RecentLeads";
 import { RecentCalls } from "@/components/dashboard/RecentCalls";
@@ -42,10 +42,12 @@ export default async function DashboardHomePage() {
     return null;
   }
 
-  const companyId = await getPrimaryCompanyId(supabase, user.id);
+  const { companyId, queryClient } = await getDashboardCompanyContext(supabase, user.id);
   if (!companyId) {
     return null;
   }
+
+  console.info(`[dashboard] using company_id: ${companyId}`);
 
   const [
     leadsRes,
@@ -54,16 +56,16 @@ export default async function DashboardHomePage() {
     recentLeadsRes,
     recentCallsRes,
   ] = await Promise.all([
-    supabase.from("leads").select("*").eq("company_id", companyId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("calls").select("*").eq("company_id", companyId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("appointments").select("*").eq("company_id", companyId).limit(200),
-    supabase
+    queryClient.from("leads").select("*").eq("company_id", companyId).order("created_at", { ascending: false }).limit(200),
+    queryClient.from("calls").select("*").eq("company_id", companyId).order("created_at", { ascending: false }).limit(200),
+    queryClient.from("appointments").select("*").eq("company_id", companyId).limit(200),
+    queryClient
       .from("leads")
       .select("*")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false })
       .limit(5),
-    supabase
+    queryClient
       .from("calls")
       .select("*")
       .eq("company_id", companyId)
@@ -85,6 +87,9 @@ export default async function DashboardHomePage() {
   const estimatedRecoveredRevenue = bookedJobs * DEFAULT_AVERAGE_JOB_VALUE;
   const urgencyTags = topTags(leads, "urgency");
   const serviceTags = topTags(leads, "service_category");
+
+  console.info(`[dashboard] leads count: ${leads.length}`);
+  console.info(`[dashboard] calls count: ${calls.length}`);
 
   return (
     <div className="space-y-8">

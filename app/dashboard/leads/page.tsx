@@ -1,5 +1,5 @@
 import { tryCreateClient } from "@/lib/supabase/server";
-import { getPrimaryCompanyId } from "@/lib/company";
+import { getDashboardCompanyContext } from "@/lib/company";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 import { SupabaseConfigError } from "@/components/dashboard/SupabaseConfigError";
 import type { Lead } from "@/lib/types/database";
@@ -17,22 +17,29 @@ export default async function LeadsPage() {
     return null;
   }
 
-  const companyId = await getPrimaryCompanyId(supabase, user.id);
+  const { companyId, queryClient } = await getDashboardCompanyContext(supabase, user.id);
   if (!companyId) {
     return null;
   }
 
-  const { data, error } = await supabase
+  console.info(`[dashboard] using company_id: ${companyId}`);
+
+  const [{ data, error }, callsCountRes] = await Promise.all([
+    queryClient
     .from("leads")
     .select("*")
     .eq("company_id", companyId)
-    .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }),
+    queryClient.from("calls").select("*", { count: "exact", head: true }).eq("company_id", companyId),
+  ]);
 
   if (error) {
     return <p className="text-sm text-red-600">Could not load leads: {error.message}</p>;
   }
 
   const leads = (data ?? []) as Lead[];
+  console.info(`[dashboard] leads count: ${leads.length}`);
+  console.info(`[dashboard] calls count: ${callsCountRes.count ?? 0}`);
 
   return (
     <div className="space-y-6">
