@@ -2,12 +2,138 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { insertLeadAndCallFromPayload } from "@/lib/calls/insertLeadAndCallFromPayload";
 import { extractDispatchFromTranscript } from "@/lib/openai/extractDispatchFromTranscript";
-import { parseVapiEndOfCallReport } from "@/lib/vapi/parseEndOfCallReport";
 import { verifyVapiWebhookSecret } from "@/lib/vapi/verifyWebhookSecret";
 import type { CallWebhookPayload } from "@/lib/types/database";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function eventFromBody(body: Record<string, unknown>): Record<string, unknown> {
+  return isRecord(body.message) ? body.message : body;
+}
+
+function callFromEvent(event: Record<string, unknown>, body: Record<string, unknown>): Record<string, unknown> | null {
+  if (isRecord(event.call)) return event.call;
+  if (isRecord(body.call)) return body.call;
+  return null;
+}
+
+function metadataCompanyId(call: Record<string, unknown> | null, event: Record<string, unknown>): string {
+  const callMeta = call && isRecord(call.metadata) ? call.metadata : {};
+  const assistant = isRecord(event.assistant) ? event.assistant : call && isRecord(call.assistant) ? call.assistant : {};
+  const assistantMeta = isRecord(assistant.metadata) ? assistant.metadata : {};
+  return (
+    stringValue(callMeta.company_id) ||
+    stringValue(callMeta.companyId) ||
+    stringValue(assistantMeta.company_id) ||
+    stringValue(assistantMeta.companyId) ||
+    stringValue(event.company_id) ||
+    stringValue(event.companyId)
+  );
+}
+
+function callerPhone(call: Record<string, unknown> | null, event: Record<string, unknown>): string {
+  const customer = call && isRecord(call.customer) ? call.customer : isRecord(event.customer) ? event.customer : {};
+  return (
+    stringValue(customer.number) ||
+    stringValue(customer.phoneNumber) ||
+    (call ? stringValue(call.phoneNumber) || stringValue(call.customerPhoneNumber) || stringValue(call.from) : "") ||
+    stringValue(event.phoneNumber) ||
+    stringValue(event.caller_phone) ||
+    stringValue(event.callerPhone)
+  );
+}
+
+function callId(call: Record<string, unknown> | null, event: Record<string, unknown>): string {
+  return (
+    (call ? stringValue(call.id) || stringValue(call.callId) : "") ||
+    stringValue(event.callId) ||
+    stringValue(event.call_id) ||
+    stringValue(event.id) ||
+    `vapi-${Date.now()}`
+  );
+}
+
+function messagesTranscript(messages: unknown): string {
+  if (!Array.isArray(messages)) return "";
+  return messages
+    .map((m) => {
+      if (!isRecord(m)) return "";
+      const role = stringValue(m.role) || "speaker";
+      const text = stringValue(m.message) || stringValue(m.content) || stringValue(m.text);
+      return text ? `${role}: ${text}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function transcriptFromEvent(event: Record<string, unknown>): string {
+  const artifact = isRecord(event.artifact) ? event.artifact : {};
+  const analysis = isRecord(event.analysis) ? event.analysis : {};
+  return (
+    stringValue(event.transcript) ||
+    stringValue(artifact.transcript) ||
+    messagesTranscript(artifact.messages) ||
+    messagesTranscript(event.messages) ||
+    stringValue(analysis.transcript)
+  );
+}
+
+function summaryFromEvent(event: Record<string, unknown>, call: Record<string, unknown> | null): string {
+  const eventAnalysis = isRecord(event.analysis) ? event.analysis : {};
+  const callAnalysis = call && isRecord(call.analysis) ? call.analysis : {};
+  return (
+    stringValue(event.summary) ||
+    stringValue(eventAnalysis.summary) ||
+    stringValue(callAnalysis.summary) ||
+    stringValue(event.result)
+  );
+}
+
+function recordingUrlFromEvent(event: Record<string, unknown>): string {
+  const artifact = isRecord(event.artifact) ? event.artifact : {};
+  const recording = isRecord(artifact.recording) ? artifact.recording : {};
+  return (
+    stringValue(artifact.recordingUrl) ||
+    stringValue(recording.url) ||
+    stringValue(recording.stereoUrl) ||
+    stringValue(recording.combinedUrl)
+  );
+}
+
+function statusFromEvent(event: Record<string, unknown>, call: Record<string, unknown> | null): string {
+  return stringValue(event.status) || stringValue(event.endedReason) || (call ? stringValue(call.status) || stringValue(call.endedReason) : "");
+}
+
+function isTerminalVapiEvent(event: Record<string, unknown>, call: Record<string, unknown> | null): boolean {
+  const type = stringValue(event.type);
+  const status = statusFromEvent(event, call).toLowerCase();
+  const analysis = isRecord(event.analysis) || Boolean(call && isRecord(call.analysis));
+  return (
+    type === "end-of-call-report" ||
+    type === "call-ended" ||
+    (type === "status-update" && ["ended", "completed", "complete"].includes(status)) ||
+    Boolean(stringValue(event.endedReason)) ||
+    analysis ||
+    Boolean(summaryFromEvent(event, call)) ||
+    Boolean(transcriptFromEvent(event))
+  );
+}
+
+function rawPayloadNote(body: Record<string, unknown>, endedReason: string): string {
+  return JSON.stringify(
+    {
+      endedReason: endedReason || null,
+      rawPayload: body,
+    },
+    null,
+    2,
+  ).slice(0, 25_000);
 }
 
 /**
@@ -21,10 +147,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export async function POST(request: Request) {
   const expectedSecret = process.env.VAPI_WEBHOOK_SECRET?.trim();
+  const isLocalTesting = process.env.NODE_ENV !== "production";
+  const hasAuthHeader = Boolean(request.headers.get("authorization") || request.headers.get("x-vapi-secret"));
 
-  // Local / testing convenience only: skip webhook auth when `VAPI_WEBHOOK_SECRET` is unset or empty.
-  // Production MUST set `VAPI_WEBHOOK_SECRET` so unauthenticated requests are rejected.
-  if (expectedSecret && !verifyVapiWebhookSecret(request, expectedSecret)) {
+  // Local / testing convenience only: allow unauthenticated Vapi webhooks when
+  // no auth header is provided. Production MUST set `VAPI_WEBHOOK_SECRET` and
+  // requests must send the matching Bearer token or `X-Vapi-Secret`.
+  const shouldVerifyAuth = Boolean(expectedSecret) && (!isLocalTesting || hasAuthHeader);
+  if (shouldVerifyAuth && expectedSecret && !verifyVapiWebhookSecret(request, expectedSecret)) {
     console.warn("[vapi-webhook] Unauthorized webhook request");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -40,36 +170,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Expected a JSON object" }, { status: 400 });
   }
 
-  const message = isRecord(body.message) ? body.message : null;
-  const msgType = message && typeof message.type === "string" ? message.type : "";
-  const call = message && isRecord(message.call) ? message.call : null;
-  const callId = call && typeof call.id === "string" ? call.id : "unknown";
-  const status = message && typeof message.status === "string" ? message.status : undefined;
+  console.info("VAPI WEBHOOK RECEIVED");
+  console.info(JSON.stringify(body, null, 2));
+
+  const event = eventFromBody(body);
+  const msgType = stringValue(event.type) || "unknown";
+  const call = callFromEvent(event, body);
+  const providerCallId = callId(call, event);
+  const status = statusFromEvent(event, call);
 
   console.info("[vapi-webhook] incoming event", {
-    type: msgType || "no_message_type",
-    callId,
+    type: msgType,
+    callId: providerCallId,
     status,
-    auth: expectedSecret ? "verified" : "skipped-local-testing",
+    auth: shouldVerifyAuth ? "verified" : "skipped-local-testing",
   });
 
-  if (msgType !== "end-of-call-report") {
-    return NextResponse.json({ ok: true, ignored: msgType || "no_message_type" });
-  }
+  console.info(`[vapi-webhook] event type: ${msgType}`);
 
-  const parsed = parseVapiEndOfCallReport(body);
-  if (!parsed.ok) {
-    console.warn("[vapi-webhook] unable to parse end-of-call report", { callId, error: parsed.error });
-    return NextResponse.json({ error: parsed.error }, { status: 400 });
-  }
-
-  const extracted = await extractDispatchFromTranscript({
-    transcript: parsed.data.transcript,
-    summaryHint: parsed.data.summary_hint,
-  });
-  if (!extracted.ok) {
-    console.error("[vapi-webhook] transcript extraction failed", { callId: parsed.data.provider_call_id, error: extracted.error });
-    return NextResponse.json({ error: extracted.error }, { status: 502 });
+  if (!isTerminalVapiEvent(event, call)) {
+    return NextResponse.json({ ok: true, ignored: msgType, terminal: false });
   }
 
   let admin;
@@ -80,38 +200,124 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: messageText }, { status: 500 });
   }
 
-  const payload: CallWebhookPayload = {
-    company_id: parsed.data.company_id,
-    provider: "vapi",
-    provider_call_id: parsed.data.provider_call_id,
-    caller_phone: parsed.data.caller_phone,
-    customer_name: extracted.data.customer_name,
-    service_address: extracted.data.service_address,
-    issue_type: extracted.data.issue_type,
-    service_category: extracted.data.service_category,
-    problem_description: extracted.data.problem_description,
-    urgency: extracted.data.urgency,
-    preferred_time: extracted.data.preferred_time,
-    appointment_request: extracted.data.appointment_request,
-    internal_notes: extracted.data.internal_notes,
-    summary: extracted.data.summary,
-    transcript: parsed.data.transcript,
-    recording_url: parsed.data.recording_url || "",
-    call_status: parsed.data.call_status,
-  };
+  let company_id = metadataCompanyId(call, event);
+  if (!company_id && isLocalTesting) {
+    const { data: fallbackCompany, error: fallbackCompanyError } = await admin
+      .from("companies")
+      .select("id")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (fallbackCompanyError || !fallbackCompany?.id) {
+      console.error("[vapi-webhook] no company_id and no dev fallback company found", {
+        error: fallbackCompanyError?.message,
+        callId: providerCallId,
+      });
+      return NextResponse.json({ ok: true, saved: false, reason: "missing_company_id", call_id: providerCallId });
+    }
+
+    company_id = fallbackCompany.id;
+    console.warn(`[vapi-webhook] missing company_id; using dev fallback company_id: ${company_id}`);
+  }
+
+  if (!company_id) {
+    console.warn("[vapi-webhook] terminal event missing company_id; payload logged above", {
+      type: msgType,
+      callId: providerCallId,
+    });
+    return NextResponse.json({ ok: true, saved: false, reason: "missing_company_id", call_id: providerCallId });
+  }
+
+  const summaryHint = summaryFromEvent(event, call);
+  const transcript = transcriptFromEvent(event) || summaryHint || `Call ended with status: ${status || msgType}.`;
+  const endedReason = stringValue(event.endedReason) || (call ? stringValue(call.endedReason) : "") || status || msgType;
+
+  let extracted: Awaited<ReturnType<typeof extractDispatchFromTranscript>>;
+  try {
+    extracted = await extractDispatchFromTranscript({
+      transcript,
+      summaryHint,
+    });
+  } catch (e) {
+    extracted = {
+      ok: false,
+      error: e instanceof Error ? e.message : "OpenAI extraction threw an unknown error",
+    };
+  }
+
+  const payload: CallWebhookPayload = extracted.ok
+    ? {
+        company_id,
+        provider: "vapi",
+        provider_call_id: providerCallId,
+        caller_phone: callerPhone(call, event) || "Unknown caller",
+        customer_name: extracted.data.customer_name,
+        service_address: extracted.data.service_address,
+        issue_type: extracted.data.issue_type,
+        service_category: extracted.data.service_category,
+        problem_description: extracted.data.problem_description,
+        urgency: extracted.data.urgency,
+        preferred_time: extracted.data.preferred_time,
+        appointment_request: extracted.data.appointment_request,
+        internal_notes: `${extracted.data.internal_notes}\n\nVapi status: ${status || "unknown"}\nEnded reason: ${endedReason || "unknown"}\n\nRaw payload:\n${rawPayloadNote(body, endedReason)}`,
+        summary: extracted.data.summary,
+        transcript,
+        recording_url: recordingUrlFromEvent(event),
+        call_status: status || endedReason || "completed",
+      }
+    : {
+        company_id,
+        provider: "vapi",
+        provider_call_id: providerCallId,
+        caller_phone: callerPhone(call, event) || "Unknown caller",
+        customer_name: "Unknown caller",
+        service_address: "Address not provided",
+        issue_type: "Call completed",
+        service_category: "plumbing",
+        problem_description: transcript || summaryHint || "Call completed.",
+        urgency: "unknown" as CallWebhookPayload["urgency"],
+        preferred_time: "Not discussed",
+        appointment_request: "Not discussed",
+        internal_notes: JSON.stringify(body, null, 2),
+        summary: "Call completed. See transcript/internal notes for details.",
+        transcript,
+        recording_url: recordingUrlFromEvent(event),
+        call_status: status || endedReason || "completed",
+      };
+
+  if (extracted.ok) {
+    console.info("[vapi-webhook] OpenAI extraction succeeded");
+  } else {
+    console.error("[vapi-webhook] OpenAI extraction failed; saving raw fallback lead", {
+      callId: providerCallId,
+      error: extracted.error,
+    });
+  }
+
+  console.info("[vapi-webhook] attempting to store call intake");
+  console.info("[vapi-webhook] normalized call intake", {
+    company_id: payload.company_id,
+    provider_call_id: payload.provider_call_id,
+    customer_phone: payload.caller_phone,
+    summary: payload.summary,
+    service_category: payload.service_category,
+    urgency: payload.urgency,
+    status: payload.call_status,
+  });
 
   const result = await insertLeadAndCallFromPayload(admin, payload, {
-    started_at: parsed.data.started_at,
-    ended_at: parsed.data.ended_at,
+    started_at: call ? stringValue(call.startedAt) || stringValue(call.createdAt) || null : null,
+    ended_at: call ? stringValue(call.endedAt) || stringValue(call.updatedAt) || new Date().toISOString() : new Date().toISOString(),
   });
 
   if (!result.ok) {
-    console.error("[vapi-webhook] failed to store call", { callId: parsed.data.provider_call_id, error: result.error });
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    console.error("[vapi-webhook] failed to store call", { callId: providerCallId, error: result.error });
+    return NextResponse.json({ ok: true, saved: false, reason: "storage_failed", error: result.error, call_id: providerCallId });
   }
 
   console.info("[vapi-webhook] stored call intake", {
-    callId: parsed.data.provider_call_id,
+    callId: providerCallId,
     leadId: result.lead_id,
     storedCallId: result.call_id,
     deduped: result.deduped,

@@ -41,6 +41,18 @@ function getMockAppointmentTime(preferredTime: string): string {
   return d.toISOString();
 }
 
+function summaryWithDetails(p: CallWebhookPayload): string {
+  return p.problem_description ? `${p.summary}\n\nProblem: ${p.problem_description}` : p.summary;
+}
+
+function transcriptWithDetails(p: CallWebhookPayload): string {
+  return p.problem_description ? `${p.transcript}\n\n--- Problem details ---\n${p.problem_description}` : p.transcript;
+}
+
+function preferredTimeWithAppointment(p: CallWebhookPayload): string {
+  return p.appointment_request || p.preferred_time;
+}
+
 /**
  * Creates a lead + call from the canonical webhook payload.
  * Idempotent on (company_id, provider, provider_call_id).
@@ -50,18 +62,6 @@ export async function insertLeadAndCallFromPayload(
   p: CallWebhookPayload,
   opts?: InsertLeadAndCallOptions,
 ): Promise<InsertLeadAndCallResult> {
-  const { data: existing } = await admin
-    .from("calls")
-    .select("id, lead_id")
-    .eq("company_id", p.company_id)
-    .eq("provider", p.provider)
-    .eq("provider_call_id", p.provider_call_id)
-    .maybeSingle();
-
-  if (existing?.id && existing.lead_id) {
-    return { ok: true, lead_id: existing.lead_id, call_id: existing.id, deduped: true };
-  }
-
   const { data: company, error: companyError } = await admin.from("companies").select("id").eq("id", p.company_id).maybeSingle();
 
   if (companyError) {
@@ -81,46 +81,45 @@ export async function insertLeadAndCallFromPayload(
     customer_name: p.customer_name,
     customer_phone: p.caller_phone,
     service_address: p.service_address,
-    issue_type: p.issue_type,
-    service_category: p.service_category ?? p.issue_type,
-    problem_description: p.problem_description ?? p.summary,
+    issue_type: p.issue_type || p.service_category || "Call completed",
     urgency: p.urgency,
     status: leadStatus,
-    preferred_time: p.preferred_time,
-    appointment_request: p.appointment_request ?? p.preferred_time,
-    internal_notes: p.internal_notes ?? "",
-    summary: p.summary,
-    transcript: p.transcript,
-    source: p.provider,
+    preferred_time: preferredTimeWithAppointment(p),
+    summary: summaryWithDetails(p),
+    transcript: transcriptWithDetails(p),
   };
-
-  const { data: lead, error: leadError } = await admin.from("leads").insert(leadRow).select("id").single();
-
-  if (leadError || !lead) {
-    return { ok: false, status: 500, error: leadError?.message ?? "Failed to create lead" };
-  }
 
   const callRow: CallsInsert = {
     company_id: p.company_id,
-    lead_id: lead.id,
-    provider: p.provider,
-    provider_call_id: p.provider_call_id,
     caller_phone: p.caller_phone,
     call_status: p.call_status,
-    recording_url: p.recording_url || null,
-    transcript: p.transcript,
-    summary: p.summary,
+    transcript: transcriptWithDetails(p),
+    summary: summaryWithDetails(p),
     urgency: p.urgency,
-    service_category: p.service_category ?? p.issue_type,
-    appointment_request: p.appointment_request ?? p.preferred_time,
-    internal_notes: p.internal_notes ?? "",
     started_at: started,
     ended_at: ended,
   };
 
-  const { data: call, error: callError } = await admin.from("calls").insert(callRow).select("id").single();
+  console.info("[vapi-webhook] final lead insert keys", Object.keys(leadRow));
+
+  const { data: lead, error: leadError } = await admin.from("leads").insert(leadRow).select("id").single();
+
+  if (leadError || !lead) {
+    console.error("[vapi-webhook] lead insert failed", leadError ?? { message: "No lead returned after insert" });
+    return { ok: false, status: 500, error: leadError?.message ?? "Failed to create lead" };
+  }
+
+  const callInsertRow: CallsInsert = {
+    ...callRow,
+    lead_id: lead.id,
+  };
+
+  console.info("[vapi-webhook] final call insert keys", Object.keys(callInsertRow));
+
+  const { data: call, error: callError } = await admin.from("calls").insert(callInsertRow).select("id").single();
 
   if (callError || !call) {
+    console.error("[vapi-webhook] call insert failed", callError ?? { message: "No call returned after insert" });
     return { ok: false, status: 500, error: callError?.message ?? "Failed to create call" };
   }
 
